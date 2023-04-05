@@ -6,6 +6,7 @@ import pytorch_lightning as pl
 from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
+from tsl.datasets import MetrLA
 
 
 class Dataset(Dataset):
@@ -71,19 +72,13 @@ class DataModule(pl.LightningModule):
 
         import os
         # Load the data from a CSV file based on the specified dataset name
-        if dataset == 'credit':
-            self.data = pd.read_csv('./data/credit.csv')
-            self.data = self.data.drop(columns=['default.payment.next.month', 'ID'])
-        elif dataset == 'cancer':
-            self.data = pd.read_csv('./data/breast.csv')
-            self.data = self.data.drop(columns=['id', 'diagnosis', 'Unnamed: 32'])
-        elif dataset == 'news':
-            self.data = pd.read_csv('./data/news.csv')
-            self.data = self.data.drop(columns=['url', ' timedelta', ' shares'])
-        elif dataset == 'spam':
-            self.data = pd.read_csv('./data/spam.csv')
-        elif dataset == 'letter':
-            self.data = pd.read_csv('./data/letter.csv')
+        if dataset == 'metr-la':
+            mtrla = MetrLA()
+            df, dist, mask = mtrla.load()
+            mask = mask.astype(bool)
+            self.data[~mask] = 0
+
+
 
         # Normalize the data if requested
         if normalize:
