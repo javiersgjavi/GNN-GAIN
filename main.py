@@ -17,15 +17,25 @@ def main(args):
     batch_size = args.batch_size
     iterations = args.iterations
 
+    accelerator = 'cpu'
+
     # Load data
     dm = DataModule(dataset=dataset, batch_size=batch_size, prop_missing=miss_rate, normalize=True)
+    edge_index, edge_weights = dm.get_connectivity()
     dm.setup()
+
+    if accelerator == 'gpu':
+        edge_index = torch.from_numpy(edge_index).cuda()
+        edge_weights = torch.from_numpy(edge_weights).cuda()
 
     # Load model
     model = GAIN(
         input_size=dm.input_size(),
+        batch_size=batch_size,
         alpha=alpha,
         hint_rate=hint_rate,
+        edge_index=edge_index,
+        edge_weights=edge_weights,
     )
 
     print(f'''
@@ -48,7 +58,7 @@ def main(args):
         max_steps=iterations,
         default_root_dir='reports/logs_experiments',
         logger=exp_logger,
-        accelerator='gpu',
+        accelerator=accelerator,
         devices=1,
     )
 
@@ -67,8 +77,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--data_name',
-        choices=['credit', 'spam', 'letter', 'breast', 'news'],
-        default='spam',
+        choices=['metr-la, electric'],
+        #default='metr-la',
+        default='electric',
         type=str)
     parser.add_argument(
         '--miss_rate',

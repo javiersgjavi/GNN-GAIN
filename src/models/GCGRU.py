@@ -1,29 +1,37 @@
 import torch
 from torch import nn
+from torch_geometric import nn as gnn
+from tsl.nn.layers import GraphConvGRUCell
 from src.utils import init_weights_xavier
 
 
-class MLP(nn.Module):
-    """
-    The simple multi-layer perceptron architecture from the original code with a configurable input size.
-
-    Args:
-        input_size (int): The size of the input tensor.
-
-    """
+class GNN(nn.Module):
 
     def __init__(self, periods, nodes, edge_index, edge_weights, batch_size):
         super().__init__()
 
-        # Define the fully connected layers in a sequential block
+        self.gnn_layer = GraphConvGRUCell(input_size=24, hidden_size=12)
+
         self.fc_block = nn.Sequential(
-            nn.Linear(periods*2, periods),
+            nn.Linear(12, 12),
             nn.ReLU(),
-            nn.Linear(periods, periods),
-            nn.ReLU(),
-            nn.Linear(periods, periods),
+            nn.Linear(12, 12),
             nn.Sigmoid()
         ).apply(init_weights_xavier)
+
+        self.edge_index = torch.IntTensor(edge_index).to(torch.int64)
+        self.edge_weights = edge_weights
+
+    def forward(self, x):
+        res = torch.zeros(x.shape[0], x.shape[1], x.shape[2]//2).to(x.device)
+        zeros = torch.zeros(x.shape[1], 12).to(x.device)
+        for i in range(x.shape[0]):
+            h = self.gnn_layer(x[i], h=zeros, edge_index=self.edge_index)
+            h = torch.functional.F.relu(h)
+            h = self.fc_block(h)
+            res[i] = h
+
+        return res
 
     def forward_g(self, x: torch.Tensor, input_mask: torch.Tensor) -> torch.Tensor:
         """
@@ -42,10 +50,9 @@ class MLP(nn.Module):
         # Concatenate the input tensor with the noise matrix
         x = input_mask * x + (1 - input_mask) * noise_matrix
 
-        input_tensor = torch.stack([x, input_mask]).permute(1, 3, 0, 2)
+        input_tensor = torch.stack([x, input_mask]).permute(1, 3, 2, 0)
         input_tensor = input_tensor.reshape(input_tensor.shape[0], input_tensor.shape[1], -1)
-
-        imputation = self.fc_block(input_tensor).permute(0, 2, 1)
+        imputation = self.forward(input_tensor).permute(0, 2, 1)
 
         # Concatenate the original data with the imputed data
         res = input_mask * x + (1 - input_mask) * imputation
@@ -64,7 +71,7 @@ class MLP(nn.Module):
             torch.Tensor: The output tensor of the discriminator network.
 
         """
-        input_tensor = torch.stack([x, hint_matrix]).permute(1, 3, 0, 2)
+        input_tensor = torch.stack([x, hint_matrix]).permute(1, 3, 2, 0)
         input_tensor = input_tensor.reshape(input_tensor.shape[0], input_tensor.shape[1], -1)
-        pred = self.fc_block(input_tensor).permute(0, 2, 1)
+        pred = self.forward(input_tensor).permute(0, 2, 1)
         return pred

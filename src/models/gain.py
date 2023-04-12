@@ -1,6 +1,10 @@
 import torch
 import pytorch_lightning as pl
 from typing import Dict, Tuple
+#from src.models.a3tgcn2 import GNN
+#from src.models.TGCN2 import GNN
+#from src.models.gatedgraphnetwork import GNN
+from src.models.GCGRU import GNN
 from src.models.mlp import MLP
 from src.utils import loss_d, loss_g
 
@@ -33,7 +37,7 @@ class HintGenerator:
 
 
 class GAIN(pl.LightningModule):
-    def __init__(self, input_size: int, alpha: float, hint_rate: float):
+    def __init__(self, input_size: tuple, alpha: float, hint_rate: float, edge_index, edge_weights, batch_size):
         """
         A PyTorch Lightning module implementing the GAIN (Generative Adversarial Imputation Network) algorithm.
 
@@ -55,8 +59,16 @@ class GAIN(pl.LightningModule):
         super().save_hyperparameters()
 
         # Three main components of the GAIN model
-        self.generator = MLP(input_size=input_size)
-        self.discriminator = MLP(input_size=input_size)
+        print(input_size)
+        args = {
+            'periods': input_size[0],
+            'nodes': input_size[1],
+            'edge_index': edge_index,
+            'edge_weights': edge_weights,
+            'batch_size': batch_size
+        }
+        self.generator = GNN(**args)
+        self.discriminator = GNN(**args)
         self.hint_generator = HintGenerator(prop_hint=hint_rate)
 
         self.loss_mse = torch.nn.MSELoss()
@@ -77,8 +89,11 @@ class GAIN(pl.LightningModule):
         x_real = outputs['x_real']
         x_fake = outputs['x_fake']
         input_mask = outputs['input_mask_bool']
+        known_values = outputs['known_values']
 
-        mse = self.loss_mse(x_fake[~input_mask], x_real[~input_mask])
+        real_values_known = torch.logical_and(~input_mask, known_values)
+
+        mse = self.loss_mse(x_fake[real_values_known], x_real[real_values_known])
 
         self.log('mse', mse, prog_bar=True)
         self.log('rmse', torch.sqrt(mse), prog_bar=True)
@@ -107,7 +122,14 @@ class GAIN(pl.LightningModule):
 
         # --------------------- Generator loss -------------------------
         g_loss_adversarial = loss_g(d_pred, input_mask_int)
-        g_loss_reconstruction = self.loss_mse(imputation[input_mask_bool], x_real[input_mask_bool])
+
+        torch.save(imputation, 'imputation.pt')
+        torch.save(x_real, 'x_real.pt')
+        torch.save(input_mask_bool, 'input_mask_bool.pt')
+        jk = imputation[input_mask_bool]
+        jk2 = x_real[input_mask_bool]
+
+        g_loss_reconstruction = self.loss_mse(jk, jk2)
 
         g_loss = g_loss_adversarial + self.alpha * g_loss_reconstruction
         # ---------------------------------------------------------------
@@ -118,7 +140,7 @@ class GAIN(pl.LightningModule):
 
         return d_loss, g_loss
 
-    def return_gan_outputs(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def return_gan_outputs(self, batch: Tuple) -> Dict[str, torch.Tensor]:
         """
         Returns the output tensors of the generator and discriminator for a given batch.
 
@@ -130,7 +152,7 @@ class GAIN(pl.LightningModule):
             A dictionary containing the output tensors of the generator and discriminator for the batch, as well as the
             real input and the input mask.
         """
-        x, x_real, input_mask_bool, input_mask_int = batch
+        x, x_real, input_mask_bool, input_mask_int, known_values = batch
 
         # Forward Generator
         x_fake, imputation = self.generator.forward_g(x=x, input_mask=input_mask_int)
@@ -148,6 +170,7 @@ class GAIN(pl.LightningModule):
             'imputation': imputation,
             'input_mask_int': input_mask_int,
             'input_mask_bool': input_mask_bool,
+            'known_values': known_values
         }
         return res
 

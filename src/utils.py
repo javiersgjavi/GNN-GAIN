@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from torch import nn
 from typing import Tuple
@@ -41,6 +42,25 @@ def generate_missing_mask(
     missing_mask = ~input_mask_new
     x[missing_mask] = 0.0
     return x, input_mask_new
+
+def create_windows_from_sequence(data, mask,  window_len=12, stride=0):
+    """
+    Create windows from a sequence.
+
+    Args:
+        data (np.ndarray): Sequence data
+        windows_len (int): Length of the windows
+
+    Returns:
+        np.ndarray: Windows
+    """
+    windows = []
+    windows_mask = []
+    for i in range(0, data.shape[0] - window_len + 1, stride):
+        windows.append(data[i:i + window_len])
+        windows_mask.append(mask[i:i + window_len])
+    return np.array(windows), np.array(windows_mask)
+
 
 
 def loss_d(d_prob: torch.Tensor, m: torch.Tensor) -> torch.Tensor:

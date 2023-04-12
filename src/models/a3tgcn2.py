@@ -1,29 +1,26 @@
 import torch
 from torch import nn
+from torch_geometric import nn as gnn
+from torch_geometric_temporal.nn.recurrent import A3TGCN2
 from src.utils import init_weights_xavier
 
 
-class MLP(nn.Module):
-    """
-    The simple multi-layer perceptron architecture from the original code with a configurable input size.
+class GNN(nn.Module):
 
-    Args:
-        input_size (int): The size of the input tensor.
-
-    """
-
-    def __init__(self, periods, nodes, edge_index, edge_weights, batch_size):
+    def __init__(self, periods, edge_index, edge_weights, batch_size):
         super().__init__()
 
-        # Define the fully connected layers in a sequential block
-        self.fc_block = nn.Sequential(
-            nn.Linear(periods*2, periods),
+        self.model = gnn.Sequential('x, edge_index, edge_weight', [
+            (A3TGCN2(in_channels=2, out_channels=periods, periods=periods, batch_size=batch_size), 'x, edge_index, edge_weight -> x'),
             nn.ReLU(),
             nn.Linear(periods, periods),
             nn.ReLU(),
             nn.Linear(periods, periods),
             nn.Sigmoid()
-        ).apply(init_weights_xavier)
+        ]).apply(init_weights_xavier)
+
+        self.edge_index = edge_index
+        self.edge_weights = edge_weights
 
     def forward_g(self, x: torch.Tensor, input_mask: torch.Tensor) -> torch.Tensor:
         """
@@ -43,9 +40,7 @@ class MLP(nn.Module):
         x = input_mask * x + (1 - input_mask) * noise_matrix
 
         input_tensor = torch.stack([x, input_mask]).permute(1, 3, 0, 2)
-        input_tensor = input_tensor.reshape(input_tensor.shape[0], input_tensor.shape[1], -1)
-
-        imputation = self.fc_block(input_tensor).permute(0, 2, 1)
+        imputation = self.model(input_tensor, self.edge_index, self.edge_weights).permute(0, 2, 1)
 
         # Concatenate the original data with the imputed data
         res = input_mask * x + (1 - input_mask) * imputation
@@ -65,6 +60,5 @@ class MLP(nn.Module):
 
         """
         input_tensor = torch.stack([x, hint_matrix]).permute(1, 3, 0, 2)
-        input_tensor = input_tensor.reshape(input_tensor.shape[0], input_tensor.shape[1], -1)
-        pred = self.fc_block(input_tensor).permute(0, 2, 1)
+        pred = self.model(input_tensor, self.edge_index, self.edge_weights).permute(0, 2, 1)
         return pred
