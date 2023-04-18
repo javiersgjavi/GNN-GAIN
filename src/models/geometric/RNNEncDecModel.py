@@ -21,7 +21,8 @@ class GNN(nn.Module):
             rnn_dropout=0.0,
             exog_size=0,
             activation='relu'
-        )
+        ).apply(init_weights_xavier)
+
         self.edge_index = edge_index
         self.edge_weights = edge_weights
 

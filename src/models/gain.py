@@ -5,8 +5,13 @@ from typing import Dict, Tuple
 #from src.models.TGCN2 import GNN
 #from src.models.gatedgraphnetwork import GNN
 #from src.models.GCGRU import GNN
-from src.models.RNNEncDecModel import GNN
+
+#Modelos que funcionan
+from src.models.geometric.RNNEncDecModel import GNN
+#from src.models.recurrent.gru import RNN
+from src.models.recurrent.lstm import RNN
 from src.models.mlp import MLP
+
 from src.utils import loss_d, loss_g
 
 
@@ -68,11 +73,15 @@ class GAIN(pl.LightningModule):
             'edge_weights': edge_weights,
             'batch_size': batch_size
         }
-        self.generator = GNN(**args)
-        self.discriminator = GNN(**args)
+        #self.generator = GNN(**args)
+        #self.discriminator = GNN(**args)
 
         #self.generator = MLP(periods=12)
         #self.discriminator = MLP(periods=12)
+
+        self.generator = RNN(periods=12)
+        self.discriminator = RNN(periods=12)
+
         self.hint_generator = HintGenerator(prop_hint=hint_rate)
 
         self.loss_mse = torch.nn.MSELoss()
