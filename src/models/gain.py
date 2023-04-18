@@ -4,7 +4,8 @@ from typing import Dict, Tuple
 #from src.models.a3tgcn2 import GNN
 #from src.models.TGCN2 import GNN
 #from src.models.gatedgraphnetwork import GNN
-from src.models.GCGRU import GNN
+#from src.models.GCGRU import GNN
+from src.models.RNNEncDecModel import GNN
 from src.models.mlp import MLP
 from src.utils import loss_d, loss_g
 
@@ -69,6 +70,9 @@ class GAIN(pl.LightningModule):
         }
         self.generator = GNN(**args)
         self.discriminator = GNN(**args)
+
+        #self.generator = MLP(periods=12)
+        #self.discriminator = MLP(periods=12)
         self.hint_generator = HintGenerator(prop_hint=hint_rate)
 
         self.loss_mse = torch.nn.MSELoss()
@@ -117,19 +121,18 @@ class GAIN(pl.LightningModule):
         input_mask_int = outputs['input_mask_int']
         input_mask_bool = outputs['input_mask_bool']
 
+        import pickle
+        with open('outputs.pkl', 'wb') as f:
+            pickle.dump(outputs, f)
+
         # --------------------- Discriminator loss ---------------------
         d_loss = loss_d(d_pred, input_mask_int)
 
         # --------------------- Generator loss -------------------------
         g_loss_adversarial = loss_g(d_pred, input_mask_int)
 
-        torch.save(imputation, 'imputation.pt')
-        torch.save(x_real, 'x_real.pt')
-        torch.save(input_mask_bool, 'input_mask_bool.pt')
-        jk = imputation[input_mask_bool]
-        jk2 = x_real[input_mask_bool]
 
-        g_loss_reconstruction = self.loss_mse(jk, jk2)
+        g_loss_reconstruction = self.loss_mse(imputation[input_mask_bool], x_real[input_mask_bool])
 
         g_loss = g_loss_adversarial + self.alpha * g_loss_reconstruction
         # ---------------------------------------------------------------

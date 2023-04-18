@@ -17,7 +17,7 @@ def main(args):
     batch_size = args.batch_size
     iterations = args.iterations
 
-    accelerator = 'cpu'
+    accelerator = 'gpu'
 
     # Load data
     dm = DataModule(dataset=dataset, batch_size=batch_size, prop_missing=miss_rate, normalize=True)

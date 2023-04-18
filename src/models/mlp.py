@@ -12,7 +12,7 @@ class MLP(nn.Module):
 
     """
 
-    def __init__(self, periods, nodes, edge_index, edge_weights, batch_size):
+    def __init__(self, periods):
         super().__init__()
 
         # Define the fully connected layers in a sequential block

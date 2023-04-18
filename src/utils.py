@@ -43,7 +43,8 @@ def generate_missing_mask(
     x[missing_mask] = 0.0
     return x, input_mask_new
 
-def create_windows_from_sequence(data, mask,  window_len=12, stride=0):
+
+def create_windows_from_sequence(data, mask, window_len=12, stride=0):
     """
     Create windows from a sequence.
 
@@ -61,6 +62,32 @@ def create_windows_from_sequence(data, mask,  window_len=12, stride=0):
         windows_mask.append(mask[i:i + window_len])
     return np.array(windows), np.array(windows_mask)
 
+
+def adapt_tensor(data, extra_data, edge_index, edge_weights):
+    # print(f'''
+    # data.shape: {data.shape}
+    # extra_data.shape: {extra_data.shape}
+    # edge_index.shape: {edge_index.shape}
+    # edge_weights.shape: {edge_weights.shape}''')
+    num_nodes = data.shape[2]
+    expand_weights = torch.ones(num_nodes).to(edge_weights.device)
+    edge_weights = torch.cat([edge_weights, expand_weights], dim=0)
+
+    expand_index = torch.stack([
+        torch.arange(num_nodes, num_nodes * 2),
+        torch.arange(num_nodes)], dim=0
+    ).to(edge_weights.device)
+    # print(f'expand_index.shape: {expand_index.shape}')
+    edge_index = torch.cat([edge_index, expand_index], dim=1)
+
+    data = torch.cat([data, extra_data], dim=2)
+
+    # print(f'''
+    # data.shape: {data.shape}
+    # edge_index.shape: {edge_index.shape}
+    # edge_weights.shape: {edge_weights.shape}''')
+
+    return data, edge_index, edge_weights
 
 
 def loss_d(d_prob: torch.Tensor, m: torch.Tensor) -> torch.Tensor:

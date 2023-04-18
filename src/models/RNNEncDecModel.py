@@ -1,8 +1,8 @@
 import torch
 from torch import nn
 from torch_geometric import nn as gnn
-from tsl.nn.layers import GatedGraphNetwork
-from src.utils import init_weights_xavier
+from tsl.nn.models import RNNEncGCNDecModel
+from src.utils import init_weights_xavier, adapt_tensor
 
 
 class GNN(nn.Module):
@@ -10,16 +10,19 @@ class GNN(nn.Module):
     def __init__(self, periods, nodes, edge_index, edge_weights, batch_size):
         super().__init__()
 
-        self.gnn_layer = GatedGraphNetwork(input_size=2, output_size=2, activation='relu')
-
-        self.fc_block = nn.Sequential(
-            nn.Linear(2, 2),
-            nn.ReLU(),
-            nn.Linear(2, 1),
-            nn.Sigmoid()
-        ).apply(init_weights_xavier)
-
-        self.edge_index = torch.IntTensor(edge_index).to(torch.int64)
+        self.model = RNNEncGCNDecModel(
+            input_size=2,
+            hidden_size=12,
+            output_size=1,
+            horizon=12,
+            rnn_layers=1,
+            gcn_layers=2,
+            gcn_dropout=0.0,
+            rnn_dropout=0.0,
+            exog_size=0,
+            activation='relu'
+        )
+        self.edge_index = edge_index
         self.edge_weights = edge_weights
 
     def forward(self, x):
@@ -45,10 +48,13 @@ class GNN(nn.Module):
         x = input_mask * x + (1 - input_mask) * noise_matrix
 
         input_tensor = torch.stack([x, input_mask]).permute(1, 2, 3, 0)
-        imputation = self.forward(input_tensor).squeeze(-1)
+        imputation = self.model(input_tensor, self.edge_index, self.edge_weights).squeeze(dim=-1)
+
+        imputation = torch.nn.functional.sigmoid(imputation)
 
         # Concatenate the original data with the imputed data
         res = input_mask * x + (1 - input_mask) * imputation
+
 
         return res, imputation
 
@@ -65,5 +71,6 @@ class GNN(nn.Module):
 
         """
         input_tensor = torch.stack([x, hint_matrix]).permute(1, 2, 3, 0)
-        pred = self.forward(input_tensor).squeeze(-1)
+        pred = self.model(input_tensor, self.edge_index, self.edge_weights).squeeze(dim=-1)
+        pred = torch.nn.functional.sigmoid(pred)
         return pred
