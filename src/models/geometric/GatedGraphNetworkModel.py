@@ -1,25 +1,27 @@
 import torch
 from torch import nn
 from torch_geometric import nn as gnn
-from tsl.nn.models import GRINModel
+from tsl.nn.models import GatedGraphNetworkModel
 from src.utils import init_weights_xavier, adapt_tensor
 
 
 class GNN(nn.Module):
-    '''GRIN es un modelo que quizás se podría utilizar con el enfoque de obtener solo las representaciones con esta librería
-    sin embargo, hay que adaptar que como parámetro de entrada recibe el la máscara de imputación, eso necesitaría más trabajo'''
 
     def __init__(self, periods, nodes, edge_index, edge_weights, batch_size):
+        '''AVISO: Este modelo no usa los pesos, simplemente recibe los vertices'''
         super().__init__()
 
-        self.model = GRINModel(
+        self.model = GatedGraphNetworkModel(
             input_size=2,
             hidden_size=12,
+            output_size=1,
+            input_window_size=12,
+            horizon=12,
             n_nodes=6,
             exog_size=0,
-            n_layers=1,
-            embedding_size=12,
-        ).apply(init_weights_xavier)
+            enc_layers=2,
+            gnn_layers=1
+        )#.apply(init_weights_xavier)
 
         self.edge_index = edge_index
         self.edge_weights = edge_weights
@@ -47,7 +49,7 @@ class GNN(nn.Module):
         x = input_mask * x + (1 - input_mask) * noise_matrix
 
         input_tensor = torch.stack([x, input_mask]).permute(1, 2, 3, 0)
-        imputation = self.model(input_tensor, self.edge_index, self.edge_weights).squeeze(dim=-1)
+        imputation = self.model(input_tensor, self.edge_index).squeeze(dim=-1)
 
         imputation = torch.nn.functional.sigmoid(imputation)
 
@@ -70,6 +72,6 @@ class GNN(nn.Module):
 
         """
         input_tensor = torch.stack([x, hint_matrix]).permute(1, 2, 3, 0)
-        pred = self.model(input_tensor, self.edge_index, self.edge_weights).squeeze(dim=-1)
+        pred = self.model(input_tensor, self.edge_index).squeeze(dim=-1)
         pred = torch.nn.functional.sigmoid(pred)
         return pred

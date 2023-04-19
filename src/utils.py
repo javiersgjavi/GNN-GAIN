@@ -16,7 +16,8 @@ def init_weights_xavier(m: nn.Module) -> None:
     """
     if isinstance(m, nn.Linear):
         nn.init.xavier_uniform_(m.weight)
-        m.bias.data.fill_(0.01)
+        if m.bias is not None:  # Este if lo he añadido a posteriori
+            m.bias.data.fill_(0.01)
 
 
 def generate_missing_mask(

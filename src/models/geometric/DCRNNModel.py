@@ -1,25 +1,23 @@
 import torch
 from torch import nn
 from torch_geometric import nn as gnn
-from tsl.nn.models import GRINModel
+from tsl.nn.models import DCRNNModel
 from src.utils import init_weights_xavier, adapt_tensor
 
 
 class GNN(nn.Module):
-    '''GRIN es un modelo que quizás se podría utilizar con el enfoque de obtener solo las representaciones con esta librería
-    sin embargo, hay que adaptar que como parámetro de entrada recibe el la máscara de imputación, eso necesitaría más trabajo'''
 
     def __init__(self, periods, nodes, edge_index, edge_weights, batch_size):
         super().__init__()
 
-        self.model = GRINModel(
+        self.model = DCRNNModel(
             input_size=2,
             hidden_size=12,
-            n_nodes=6,
+            output_size=1,
+            horizon=12,
             exog_size=0,
-            n_layers=1,
-            embedding_size=12,
-        ).apply(init_weights_xavier)
+            activation='relu',
+        )#.apply(init_weights_xavier)
 
         self.edge_index = edge_index
         self.edge_weights = edge_weights

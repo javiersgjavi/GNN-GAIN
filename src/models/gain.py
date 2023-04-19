@@ -6,12 +6,16 @@ from typing import Dict, Tuple
 #from src.models.gatedgraphnetwork import GNN
 #from src.models.GCGRU import GNN
 #from src.models.geometric.GRIN import GNN
-
+#from  src.models.geometric.EvolveGCNModel import GNN
 
 #Modelos que funcionan
+from src.models.geometric.AGCRNModel import GNN
+#from src.models.geometric.GatedGraphNetworkModel import GNN
+#from src.models.geometric.GraphWaveNetModel import GNN
+#from src.models.geometric.DCRNNModel import GNN
 #from src.models.geometric.GRUGCNModel import GNN
 #from src.models.geometric.STCNModel import GNN
-#rom src.models.geometric.RNNEncDecModel import GNN
+#from src.models.geometric.RNNEncDecModel import GNN
 
 #from src.models.recurrent.gru import RNN
 from src.models.recurrent.lstm import RNN
