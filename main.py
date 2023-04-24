@@ -20,8 +20,9 @@ def main(args):
     accelerator = 'gpu'
 
     # Load data
-    dm = DataModule(dataset=dataset, batch_size=batch_size, prop_missing=miss_rate, normalize=True)
+    dm = DataModule(dataset=dataset, batch_size=batch_size, prop_missing=miss_rate)
     edge_index, edge_weights = dm.get_connectivity()
+    normalizer = dm.get_normalizer()
     dm.setup()
 
     if accelerator == 'gpu':
@@ -36,6 +37,7 @@ def main(args):
         hint_rate=hint_rate,
         edge_index=edge_index,
         edge_weights=edge_weights,
+        normalizer=normalizer,
     )
 
     print(f'''
@@ -78,8 +80,8 @@ if __name__ == '__main__':
     parser.add_argument(
         '--data_name',
         choices=['metr-la, electric'],
-        #default='metr-la',
-        default='electric',
+        default='metr-la',
+        # default='electric',
         type=str)
     parser.add_argument(
         '--miss_rate',

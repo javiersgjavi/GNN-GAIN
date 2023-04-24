@@ -1,16 +1,16 @@
 import torch
-from torch import nn
-from torch_geometric import nn as gnn
-from src.utils import init_weights_xavier, adapt_tensor
+from typing import Tuple
+from torch import nn, Tensor
+from src.utils import init_weights_xavier, generate_uniform_noise
 
 
 class RNN(nn.Module):
 
-    def __init__(self, periods):
+    def __init__(self, periods, nodes):
         super().__init__()
 
-        self.gru1 = nn.GRU(input_size=12, hidden_size=6, batch_first=True, dropout=0.0, num_layers=1, bidirectional=True).apply(init_weights_xavier)
-        self.gru2 = nn.GRU(input_size=12, hidden_size=6, batch_first=True, dropout=0.0, num_layers=1).apply(init_weights_xavier)
+        self.gru1 = nn.GRU(input_size=periods, hidden_size=nodes, batch_first=True, dropout=0.0, num_layers=1, bidirectional=True).apply(init_weights_xavier)
+        self.gru2 = nn.GRU(input_size=periods, hidden_size=nodes, batch_first=True, dropout=0.0, num_layers=1).apply(init_weights_xavier)
         self.fc = nn.Linear(6, 6).apply(init_weights_xavier)
 
     def forward(self, x):
@@ -19,7 +19,7 @@ class RNN(nn.Module):
         y = nn.functional.sigmoid(self.fc(h))
         return y
 
-    def forward_g(self, x: torch.Tensor, input_mask: torch.Tensor) -> torch.Tensor:
+    def forward_g(self, x: torch.Tensor, input_mask: torch.Tensor) -> Tuple[Tensor, Tensor]:
         """
         The forward pass of the generator network.
 
@@ -29,10 +29,10 @@ class RNN(nn.Module):
 
         Returns:
             torch.Tensor: The output tensor of the generator network.
+            torch.Tensor: The imputed tensor.
 
         """
-        noise_matrix = torch.distributions.uniform.Uniform(0, 0.01).sample(x.shape).to(x.device)
-        #noise_matrix = torch.distributions.normal.Normal(0, 1).sample(x.shape).to(x.device)
+        noise_matrix = generate_uniform_noise(tensor_like=x)
 
         # Concatenate the input tensor with the noise matrix
         x = input_mask * x + (1 - input_mask) * noise_matrix
@@ -42,7 +42,6 @@ class RNN(nn.Module):
 
         # Concatenate the original data with the imputed data
         res = input_mask * x + (1 - input_mask) * imputation
-
 
         return res, imputation
 

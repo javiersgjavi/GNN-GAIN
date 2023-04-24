@@ -65,7 +65,6 @@ class DataModule(pl.LightningModule):
     Args:
         dataset (str): The name of the dataset to load. Must be either 'credit' or 'spam'.
         batch_size (int): The size of each batch to load.
-        normalize (bool): Whether to normalize the data.
         val_len (float): The proportion of the data to use for validation.
         test_len (float): The proportion of the data to use for testing.
         prop_missing (float): The proportion of values in the data to set to NaN to simulate missing data.
@@ -74,7 +73,6 @@ class DataModule(pl.LightningModule):
     def __init__(self,
                  dataset: str = 'credit',
                  batch_size: int = 128,
-                 normalize: bool = False,
                  val_len: float = 0.1,
                  test_len: float = 0.1,
                  prop_missing: float = 0.2):
@@ -105,9 +103,8 @@ class DataModule(pl.LightningModule):
             self.edge_weights = np.array(edge_weights).astype(np.float32)
 
         # Normalize the data if requested
-        if normalize:
-            self.normalizer = MinMaxScaler()
-            self.data = pd.DataFrame(self.normalizer.fit_transform(self.data), columns=self.data.columns)
+        self.normalizer = MinMaxScaler()
+        self.data = pd.DataFrame(self.normalizer.fit_transform(self.data), columns=self.data.columns)
 
         self.data, self.mask = create_windows_from_sequence(self.data, self.mask, window_len=12, stride=1)
 
@@ -158,3 +155,6 @@ class DataModule(pl.LightningModule):
 
     def get_connectivity(self):
         return self.edge_index, self.edge_weights
+
+    def get_normalizer(self):
+        return self.normalizer

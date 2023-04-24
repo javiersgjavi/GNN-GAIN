@@ -1,18 +1,20 @@
 import torch
+import numpy as np
 import pytorch_lightning as pl
 from typing import Dict, Tuple
+from sklearn.metrics import mean_squared_error
 
-#Modelos que funcionan
-from src.models.geometric.AGCRNModel import GNN
-#from src.models.geometric.GatedGraphNetworkModel import GNN
-#from src.models.geometric.GraphWaveNetModel import GNN
-#from src.models.geometric.DCRNNModel import GNN
-#from src.models.geometric.GRUGCNModel import GNN
-#from src.models.geometric.STCNModel import GNN
-#from src.models.geometric.RNNEncDecModel import GNN
+# Modelos que funcionan
+# from src.models.geometric.AGCRNModel import GNN
+# from src.models.geometric.GatedGraphNetworkModel import GNN
+# from src.models.geometric.GraphWaveNetModel import GNN
+# from src.models.geometric.DCRNNModel import GNN
+# from src.models.geometric.GRUGCNModel import GNN
+# from src.models.geometric.STCNModel import GNN
+from src.models.geometric.RNNEncDecModel import GNN
 
-#from src.models.recurrent.gru import RNN
-from src.models.recurrent.lstm import RNN
+# from src.models.recurrent.gru import RNN
+# from src.models.recurrent.lstm import RNN
 
 from src.models.mlp import MLP
 
@@ -47,7 +49,8 @@ class HintGenerator:
 
 
 class GAIN(pl.LightningModule):
-    def __init__(self, input_size: tuple, alpha: float, hint_rate: float, edge_index, edge_weights, batch_size):
+    def __init__(self, input_size: tuple, alpha: float, hint_rate: float, edge_index, edge_weights, batch_size,
+                 normalizer):
         """
         A PyTorch Lightning module implementing the GAIN (Generative Adversarial Imputation Network) algorithm.
 
@@ -69,10 +72,14 @@ class GAIN(pl.LightningModule):
         super().save_hyperparameters()
 
         # Three main components of the GAIN model
-        print(input_size)
+        self.alpha = alpha
+        self.nodes = input_size[1]
+        self.normalizer = normalizer
+        self.loss_mse = torch.nn.MSELoss()
+
         args = {
             'periods': input_size[0],
-            'nodes': input_size[1],
+            'nodes': self.nodes,
             'edge_index': edge_index,
             'edge_weights': edge_weights,
             'batch_size': batch_size
@@ -80,17 +87,13 @@ class GAIN(pl.LightningModule):
         self.generator = GNN(**args)
         self.discriminator = GNN(**args)
 
-        #self.generator = MLP(periods=12)
-        #self.discriminator = MLP(periods=12)
+        # self.generator = MLP(periods=12)
+        # self.discriminator = MLP(periods=12)
 
-        #self.generator = RNN(periods=12)
-        #self.discriminator = RNN(periods=12)
+        # self.generator = RNN(**args)
+        # self.discriminator = RNN(**args)
 
         self.hint_generator = HintGenerator(prop_hint=hint_rate)
-
-        self.loss_mse = torch.nn.MSELoss()
-
-        self.alpha = alpha
 
     # -------------------- Custom methods --------------------
 
@@ -103,18 +106,32 @@ class GAIN(pl.LightningModule):
                 outputs: A dictionary containing the output tensors for a batch.
                 type_step: A string indicating whether the batch is for training or validation (default is 'train').
             """
-        x_real = outputs['x_real']
-        x_fake = outputs['x_fake']
+        x_real_norm = outputs['x_real']
+        x_fake_norm = outputs['x_fake']
         input_mask = outputs['input_mask_bool']
         known_values = outputs['known_values']
 
+        x_real_denorm = self.normalizer.inverse_transform(x_real_norm.reshape(-1, self.nodes).detach().cpu())
+        x_fake_denorm = self.normalizer.inverse_transform(x_fake_norm.reshape(-1, self.nodes).detach().cpu())
+
         real_values_known = torch.logical_and(~input_mask, known_values)
 
-        mse = self.loss_mse(x_fake[real_values_known], x_real[real_values_known])
+        fake_norm = x_fake_norm[real_values_known]
+        real_norm = x_real_norm[real_values_known]
 
-        self.log('mse', mse, prog_bar=True)
-        self.log('rmse', torch.sqrt(mse), prog_bar=True)
-        self.logger.experiment.add_scalars('mse_graph', {type_step: mse}, self.global_step)
+        fake_denorm = x_real_denorm[real_values_known.reshape(-1, self.nodes).cpu()]
+        real_denorm = x_fake_denorm[real_values_known.reshape(-1, self.nodes).cpu()]
+
+        mse_norm = self.loss_mse(fake_norm, real_norm)
+
+        mse_denorm = mean_squared_error(fake_denorm, real_denorm)
+
+        self.log('mse_norm', mse_norm, prog_bar=True)
+        self.log('rmse_norm', torch.sqrt(mse_norm), prog_bar=True)
+
+        self.log('mse_denorm', mse_denorm)
+        self.log('rmse_denorm', np.sqrt(mse_denorm))
+        self.logger.experiment.add_scalars('mse_graph', {type_step: mse_norm}, self.global_step)
 
     def loss(self, outputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -143,7 +160,6 @@ class GAIN(pl.LightningModule):
 
         # --------------------- Generator loss -------------------------
         g_loss_adversarial = loss_g(d_pred, input_mask_int)
-
 
         g_loss_reconstruction = self.loss_mse(imputation[input_mask_bool], x_real[input_mask_bool])
 
