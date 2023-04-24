@@ -1,12 +1,6 @@
 import torch
 import pytorch_lightning as pl
 from typing import Dict, Tuple
-#from src.models.a3tgcn2 import GNN
-#from src.models.TGCN2 import GNN
-#from src.models.gatedgraphnetwork import GNN
-#from src.models.GCGRU import GNN
-#from src.models.geometric.GRIN import GNN
-#from  src.models.geometric.EvolveGCNModel import GNN
 
 #Modelos que funcionan
 from src.models.geometric.AGCRNModel import GNN
