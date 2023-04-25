@@ -86,12 +86,13 @@ if __name__ == '__main__':
     parser.add_argument(
         '--miss_rate',
         help='missing data probability',
-        default=0.2,
+        default=0.25,
         type=float)
     parser.add_argument(
         '--batch_size',
         help='the number of samples in mini-batch',
-        default=128,
+        # default=128,
+        default=64,
         type=int)
     parser.add_argument(
         '--hint_rate',

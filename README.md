@@ -48,17 +48,18 @@
 </details>
 
 
-# Capas a probar:
-
-start enum of links:
-- [GConvGRU](https://pytorch-geometric-temporal.readthedocs.io/en/latest/modules/root.html#id16)
-- [GConvLSTM](https://pytorch-geometric-temporal.readthedocs.io/en/latest/modules/root.html#id17)
-- 
-- [TAGConv](https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.nn.conv.TAGConv.html#torch_geometric.nn.conv.TAGConv)
-- [GatedGraphConv](https://pytorch-geometric.readthedocs.io/en/latest/modules/nn.html#torch_geometric.nn.conv.GatedGraphConv)
-- [TemporalEncoding](https://pytorch-geometric.readthedocs.io/en/latest/modules/nn.html#torch_geometric.nn.encoding.TemporalEncoding)
-
-- las de tsl
+# Tabla de modelos
+|         Modelo         | Implementado | Vertices | Pesos |
+|:----------------------:|:------------:|:--------:|:-----:|
+|       DCRNNModel       |      ✓       |    ✓     |   ✓   |
+|    GraphWaveNetModel   |      ✓       |    ✓     |   ✓   |
+| GatedGraphNetworkModel |      ✓       |    ✓     |       |
+|    RNNEncGCNDecModel   |      ✓       |    ✓     |   ✓   |
+|        STCNModel       |      ✓       |    ✓     |   ✓   |
+|       GRUGCNModel      |      ✓       |    ✓     |   ✓   |
+|       AGCRNModel       |      ✓       |          |       |
+|        GRINModel       |              |    ✓     |  ✓    |
+|     EvolveGCNModel     |              |  ✓       |   ✓   |
 <a name="about-the-project"/>
 
 ## About The Project

@@ -106,7 +106,7 @@ class DataModule(pl.LightningModule):
         self.normalizer = MinMaxScaler()
         self.data = pd.DataFrame(self.normalizer.fit_transform(self.data), columns=self.data.columns)
 
-        self.data, self.mask = create_windows_from_sequence(self.data, self.mask, window_len=12, stride=1)
+        self.data, self.mask = create_windows_from_sequence(self.data, self.mask, window_len=24, stride=1)
 
         # Convert the data to a numpy array
         self.data_numpy = self.data.astype(np.float32)

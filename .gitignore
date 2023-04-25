@@ -1,5 +1,6 @@
 # Byte-compiled / optimized / DLL files
-data/.
+data/*
+.vscode/
 reports/*
 reports/replication_table1/
 .idea/*

@@ -2,7 +2,8 @@ import torch
 import numpy as np
 import pytorch_lightning as pl
 from typing import Dict, Tuple
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+from torchmetrics import MeanAbsoluteError
 
 # Modelos que funcionan
 # from src.models.geometric.AGCRNModel import GNN
@@ -76,6 +77,7 @@ class GAIN(pl.LightningModule):
         self.nodes = input_size[1]
         self.normalizer = normalizer
         self.loss_mse = torch.nn.MSELoss()
+        self.mae = MeanAbsoluteError()
 
         args = {
             'periods': input_size[0],
@@ -111,27 +113,32 @@ class GAIN(pl.LightningModule):
         input_mask = outputs['input_mask_bool']
         known_values = outputs['known_values']
 
-        x_real_denorm = self.normalizer.inverse_transform(x_real_norm.reshape(-1, self.nodes).detach().cpu())
-        x_fake_denorm = self.normalizer.inverse_transform(x_fake_norm.reshape(-1, self.nodes).detach().cpu())
-
         real_values_known = torch.logical_and(~input_mask, known_values)
 
         fake_norm = x_fake_norm[real_values_known]
         real_norm = x_real_norm[real_values_known]
 
-        fake_denorm = x_real_denorm[real_values_known.reshape(-1, self.nodes).cpu()]
-        real_denorm = x_fake_denorm[real_values_known.reshape(-1, self.nodes).cpu()]
-
         mse_norm = self.loss_mse(fake_norm, real_norm)
+        mae_norm = self.mae(fake_norm, real_norm)
 
-        mse_denorm = mean_squared_error(fake_denorm, real_denorm)
-
-        self.log('mse_norm', mse_norm, prog_bar=True)
-        self.log('rmse_norm', torch.sqrt(mse_norm), prog_bar=True)
-
-        self.log('mse_denorm', mse_denorm)
-        self.log('rmse_denorm', np.sqrt(mse_denorm))
+        self.log('mse', mse_norm, prog_bar=True)
+        self.log('rmse', torch.sqrt(mse_norm), prog_bar=True)
+        self.log('mae', mae_norm)
         self.logger.experiment.add_scalars('mse_graph', {type_step: mse_norm}, self.global_step)
+
+        if type_step == 'val' or type_step == 'test':
+            x_real_denorm = self.normalizer.inverse_transform(x_real_norm.reshape(-1, self.nodes).detach().cpu())
+            x_fake_denorm = self.normalizer.inverse_transform(x_fake_norm.reshape(-1, self.nodes).detach().cpu())
+
+            fake_denorm = x_real_denorm[real_values_known.reshape(-1, self.nodes).cpu()]
+            real_denorm = x_fake_denorm[real_values_known.reshape(-1, self.nodes).cpu()]
+
+            mse_denorm = mean_squared_error(fake_denorm, real_denorm)
+            mae_denorm = mean_absolute_error(fake_denorm, real_denorm)
+
+            self.log('denorm_mse', mse_denorm)
+            self.log('denorm_rmse', np.sqrt(mse_denorm))
+            self.log('denorm_mae', mae_denorm)
 
     def loss(self, outputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -208,7 +215,7 @@ class GAIN(pl.LightningModule):
 
     # -------------------- Methods from PyTorch Lightning --------------------
 
-    def configure_optimizers(self) -> Tuple[torch.optim.Optimizer]:
+    def configure_optimizers(self) -> Tuple[torch.optim.Optimizer, torch.optim.Optimizer]:
         """
             Configure the optimizers for the GAN model.
         """
