@@ -12,7 +12,7 @@ class GNN(nn.Module):
 
         self.model = RNNEncGCNDecModel(
             input_size=2,
-            hidden_size=nodes,
+            hidden_size=periods,
             output_size=1,
             horizon=periods,
             rnn_layers=1,

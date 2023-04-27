@@ -13,7 +13,7 @@ class GNN(nn.Module):
 
         self.model = GatedGraphNetworkModel(
             input_size=2,
-            hidden_size=nodes,
+            hidden_size=periods,
             output_size=1,
             input_window_size=periods,
             horizon=periods,

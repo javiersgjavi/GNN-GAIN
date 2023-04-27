@@ -13,7 +13,7 @@ class GNN(nn.Module):
 
         self.model = EvolveGCNModel(
             input_size=2,
-            hidden_size=nodes,
+            hidden_size=periods,
             output_size=1,
             horizon=periods,
             exog_size=0,

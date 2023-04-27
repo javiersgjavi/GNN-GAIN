@@ -11,11 +11,13 @@ from pytorch_lightning.loggers import TensorBoardLogger
 def main(args):
     # Parse arguments
     alpha = args.alpha
-    dataset = args.data_name
+    dataset = args.dataset
     hint_rate = args.hint_rate
     miss_rate = args.miss_rate
     batch_size = args.batch_size
     iterations = args.iterations
+    imputation_problem = args.imputation_problem
+    dataset = f'{dataset}_{imputation_problem}'
 
     accelerator = 'gpu'
 
@@ -78,10 +80,10 @@ if __name__ == '__main__':
     # Inputs for the experiment
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--data_name',
-        choices=['metr-la, electric'],
-        default='metr-la',
-        # default='electric',
+        '--dataset',
+        choices=['la', 'electric', 'air', 'air-36', 'bay'],
+        # default='la',
+        default='electric',
         type=str)
     parser.add_argument(
         '--miss_rate',
@@ -109,6 +111,12 @@ if __name__ == '__main__':
         help='number of training iterations',
         default=10000,
         type=int)
+    parser.add_argument(
+        '--imputation_problem',
+        help='type of imputation problem',
+        choices=['point', 'block'],
+        default='point',
+        type=str)
 
     args = parser.parse_args()
 

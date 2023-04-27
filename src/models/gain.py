@@ -19,7 +19,7 @@ from src.models.geometric.RNNEncDecModel import GNN
 
 from src.models.mlp import MLP
 
-from src.utils import loss_d, loss_g
+from src.utils import loss_d, loss_g, mean_relative_error
 
 
 class HintGenerator:
@@ -135,10 +135,14 @@ class GAIN(pl.LightningModule):
 
             mse_denorm = mean_squared_error(fake_denorm, real_denorm)
             mae_denorm = mean_absolute_error(fake_denorm, real_denorm)
+            mre_denorm = mean_relative_error(fake_denorm, real_denorm)
 
-            self.log('denorm_mse', mse_denorm)
             self.log('denorm_rmse', np.sqrt(mse_denorm))
             self.log('denorm_mae', mae_denorm)
+            self.log('denorm_mse', mse_denorm)
+            self.log('denorm_mre', mre_denorm)
+
+
 
     def loss(self, outputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         """

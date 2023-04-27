@@ -6,15 +6,47 @@ from torch.utils.data import Dataset, DataLoader
 import pytorch_lightning as pl
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
-from tsl.datasets import MetrLA
+from tsl.datasets import MetrLA, AirQuality, PemsBay
+from tsl.ops.imputation import add_missing_values
 from src.utils import create_windows_from_sequence
 
-class Dataset(Dataset):
+
+class ElectricDataset:
+    def __init__(self, prop_missing=0.25):
+        self.prop_missing = prop_missing
+        self.data = pd.read_csv('data/electric/normal.csv')
+        self.training_mask = np.random.rand(*self.data.shape) > self.prop_missing
+        self.eval_mask = np.ones_like(self.data)
+        self.edge_index, self.edge_weights = self._calculate_connectivity()
+
+    def _calculate_connectivity(self):
+        edge_index = np.array([
+            np.repeat(np.arange(6), 6),
+            np.tile(np.arange(6), 6)
+        ])
+        edge_weights = []
+        correlation = self.data.corr()
+        for i in range(edge_index.shape[1]):
+            e1 = edge_index[0, i]
+            e2 = edge_index[1, i]
+            value = correlation.iloc[e1, e2]
+            edge_weights.append(value)
+        edge_weights = np.array(edge_weights).astype(np.float32)
+        return edge_index, edge_weights
+
+    def get_connectivity(self):
+        return self.edge_index, self.edge_weights
+
+    def dataframe(self):
+        return self.data
+
+
+class DatasetLoader(Dataset):
     def __init__(self, data: npt.NDArray,
                  mask=None,
+                 known_values=None,
                  edge_index=None,
-                 edge_weights=None,
-                 prop_missing: Optional = None):
+                 edge_weights=None):
         """
         Initialize Dataset object
 
@@ -23,20 +55,13 @@ class Dataset(Dataset):
         prop_missing (float): Proportion of missing data to simulate.
         """
         self.data = data
-        self.known_values = mask
-        self.mask = mask
+        self.known_values = known_values
+        self.input_mask_bool = mask.astype(bool)
+        self.input_mask_int = mask.astype(int)
         self.edge_index = edge_index
         self.edge_weights = edge_weights
 
-        if prop_missing is not None:
-            # Create a mask to simulate missing data
-            self.input_mask = np.random.rand(*self.data.shape) > prop_missing
-            if np.sum(self.known_values) != self.known_values.size:
-                self.input_mask = np.where(self.known_values == 0, 0, self.input_mask)
-            self.data_missing = np.where(self.input_mask, self.data, 0.0)
-        else:
-            self.input_mask = np.ones_like(self.data, dtype=bool)
-            self.data_missing = self.data.copy()
+        self.data_missing = np.where(self.input_mask_bool, self.data, 0.0)
 
     def __len__(self):
         return len(self.data)
@@ -52,10 +77,11 @@ class Dataset(Dataset):
         Tuple: A tuple containing the missing data, the complete data, and the input mask.
         """
 
-        return self.data_missing[idx], self.data[idx], self.input_mask[idx].astype(bool), self.input_mask[idx].astype(int), self.known_values[idx]
+        return self.data_missing[idx], self.data[idx], self.input_mask_bool[idx], self.input_mask_int[idx], \
+            self.known_values[idx]
 
     def get_missing_rate(self):
-        print(f'Missing rate: {np.round(np.mean(self.input_mask == 0), 2)}')
+        print(f'Missing percentaje: {np.round(np.mean(self.input_mask_int == 0)*100, 2)}')
 
 
 class DataModule(pl.LightningModule):
@@ -80,33 +106,47 @@ class DataModule(pl.LightningModule):
         super().__init__()
 
         # Load the data from a CSV file based on the specified dataset name
-        if dataset == 'metr-la':
-            mtrla = MetrLA()
-            self.data, _, self.mask = mtrla.load(impute_zeros=False)
-            self.edge_index, self.edge_weights = mtrla.get_connectivity()
 
-        elif dataset == 'electric':
-            self.data = pd.read_csv('data/electric.csv')
-            self.mask = np.ones_like(self.data)
+        if dataset.endswith('_point'):
+            p_fault, p_noise = 0., 0.25
+        elif dataset.endswith('_block'):
+            p_fault, p_noise = 0.0015, 0.05
 
-            self.edge_index = np.array([
-                np.repeat(np.arange(6), 6),
-                np.tile(np.arange(6), 6)
-            ])
-            edge_weights = []
-            correlation = self.data.corr()
-            for i in range(self.edge_index.shape[1]):
-                e1 = self.edge_index[0, i]
-                e2 = self.edge_index[1, i]
-                value = correlation.iloc[e1, e2]
-                edge_weights.append(value)
-            self.edge_weights = np.array(edge_weights).astype(np.float32)
+        if dataset.startswith('la'):
+            base_data = add_missing_values(MetrLA(),
+                                           p_fault=p_fault,
+                                           p_noise=p_noise,
+                                           min_seq=12,
+                                           max_seq=12 * 4,
+                                           seed=9101112)
 
-        # Normalize the data if requested
+        elif dataset.startswith('bay'):
+            base_data = add_missing_values(PemsBay(),
+                                           p_fault=p_fault,
+                                           p_noise=p_noise,
+                                           min_seq=12,
+                                           max_seq=12 * 4,
+                                           seed=56789)
+
+        elif dataset.startswith('air'):
+            base_data = AirQuality(small='36' in dataset)
+
+        elif dataset.startswith('electric'):
+            base_data = ElectricDataset(prop_missing=prop_missing)
+
+        self.data = base_data.dataframe()
+        self.mask = base_data.training_mask
+        self.known_values = base_data.eval_mask
+        self.edge_index, self.edge_weights = base_data.get_connectivity()
+
         self.normalizer = MinMaxScaler()
         self.data = pd.DataFrame(self.normalizer.fit_transform(self.data), columns=self.data.columns)
 
-        self.data, self.mask = create_windows_from_sequence(self.data, self.mask, window_len=24, stride=1)
+        self.data, self.mask, self.known_values = create_windows_from_sequence(self.data,
+                                                                               self.mask,
+                                                                               self.known_values,
+                                                                               window_len=24,
+                                                                               stride=1)
 
         # Convert the data to a numpy array
         self.data_numpy = self.data.astype(np.float32)
@@ -128,18 +168,30 @@ class DataModule(pl.LightningModule):
         """
 
         # Split the data into train, validation, and test sets using train_test_split
-        data_train, data_test, train_mask, test_mask = train_test_split(self.data_numpy, self.mask, test_size=self.val_len + self.test_len)
-        data_val, data_test, val_mask, test_mask = train_test_split(data_test, test_mask, test_size=self.val_len / (self.val_len + self.test_len))
+        data_train, data_test, train_mask, \
+            test_mask, train_known_values, test_known_values = train_test_split(self.data_numpy,
+                                                                                self.mask,
+                                                                                self.known_values,
+                                                                                test_size=self.val_len + self.test_len)
+
+        data_val, data_test, val_mask, \
+            test_mask, val_known_values, test_known_values = train_test_split(data_test,
+                                                                              test_mask,
+                                                                              test_known_values,
+                                                                              test_size=self.val_len / (
+                                                                                          self.val_len + self.test_len))
 
         # Create Dataset objects for each set with missing values introduced according to prop_missing
-        data_train = Dataset(data_train, prop_missing=self.prop_missing, mask=train_mask)
-        data_val = Dataset(data_val, prop_missing=self.prop_missing, mask=val_mask)
-        data_test = Dataset(data_test, prop_missing=self.prop_missing, mask=test_mask)
+        data_train = DatasetLoader(data_train, mask=train_mask, known_values=train_known_values)
+        data_val = DatasetLoader(data_val, mask=val_mask, known_values=val_known_values)
+        data_test = DatasetLoader(data_test, mask=test_mask, known_values=test_known_values)
 
         # Create DataLoader objects for each set
         self.train_loader = DataLoader(data_train, batch_size=self.batch_size, shuffle=True)
         self.val_loader = DataLoader(data_val, batch_size=self.batch_size, shuffle=False)
         self.test_loader = DataLoader(data_test, batch_size=self.batch_size, shuffle=False)
+
+        data_train.get_missing_rate()
 
     def input_size(self):
         return self.data.shape[1:]
