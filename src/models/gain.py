@@ -5,17 +5,7 @@ from typing import Dict, Tuple
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from torchmetrics import MeanAbsoluteError
 
-# Modelos que funcionan
-# from src.models.geometric.AGCRNModel import GNN
-# from src.models.geometric.GatedGraphNetworkModel import GNN
-# from src.models.geometric.GraphWaveNetModel import GNN
-# from src.models.geometric.DCRNNModel import GNN
-# from src.models.geometric.GRUGCNModel import GNN
-# from src.models.geometric.STCNModel import GNN
-from src.models.geometric.RNNEncDecModel import GNN
-
-# from src.models.recurrent.gru import RNN
-# from src.models.recurrent.lstm import RNN
+from src.models.geometric.gnn_models import STCN, GRUGCN, RNNEncGCNDec, GatedGraphNetwork
 
 from src.models.mlp import MLP
 
@@ -50,8 +40,8 @@ class HintGenerator:
 
 
 class GAIN(pl.LightningModule):
-    def __init__(self, input_size: tuple, alpha: float, hint_rate: float, edge_index, edge_weights, batch_size,
-                 normalizer):
+    def __init__(self, input_size: tuple, edge_index, edge_weights, normalizer, model_type: str = None,
+                 hint_rate: float = 0.9, alpha: float = 100, params: Dict = None):
         """
         A PyTorch Lightning module implementing the GAIN (Generative Adversarial Imputation Network) algorithm.
 
@@ -72,7 +62,14 @@ class GAIN(pl.LightningModule):
         super().__init__()
         super().save_hyperparameters()
 
-        # Three main components of the GAIN model
+        model_class = {
+            'stcn': STCN,
+            'grugcn': GRUGCN,
+            'rnngcn': RNNEncGCNDec,
+            'ggn': GatedGraphNetwork,
+            'mlp': MLP
+        }
+
         self.alpha = alpha
         self.nodes = input_size[1]
         self.normalizer = normalizer
@@ -84,16 +81,13 @@ class GAIN(pl.LightningModule):
             'nodes': self.nodes,
             'edge_index': edge_index,
             'edge_weights': edge_weights,
-            'batch_size': batch_size
         }
-        self.generator = GNN(**args)
-        self.discriminator = GNN(**args)
 
-        # self.generator = MLP(periods=12)
-        # self.discriminator = MLP(periods=12)
+        self.args = {**args, **params}
 
-        # self.generator = RNN(**args)
-        # self.discriminator = RNN(**args)
+        # Three main components of the GAIN model
+        self.generator = model_class[model_type](self.args)
+        self.discriminator = model_class[model_type](self.args)
 
         self.hint_generator = HintGenerator(prop_hint=hint_rate)
 
@@ -142,8 +136,6 @@ class GAIN(pl.LightningModule):
             self.log('denorm_mse', mse_denorm)
             self.log('denorm_mre', mre_denorm)
 
-
-
     def loss(self, outputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         """
             Calculates the loss of the generator and discriminator. The losses are calculated with the
@@ -161,10 +153,6 @@ class GAIN(pl.LightningModule):
         imputation = outputs['imputation']
         input_mask_int = outputs['input_mask_int']
         input_mask_bool = outputs['input_mask_bool']
-
-        import pickle
-        with open('outputs.pkl', 'wb') as f:
-            pickle.dump(outputs, f)
 
         # --------------------- Discriminator loss ---------------------
         d_loss = loss_d(d_pred, input_mask_int)
@@ -223,8 +211,8 @@ class GAIN(pl.LightningModule):
         """
             Configure the optimizers for the GAN model.
         """
-        opt_d = torch.optim.Adam(self.discriminator.parameters())
-        opt_g = torch.optim.Adam(self.generator.parameters())
+        opt_d = torch.optim.Adam(self.discriminator.parameters(), lr=self.args['learning_rate'])
+        opt_g = torch.optim.Adam(self.generator.parameters(), lr=self.args['learning_rate'])
         return opt_d, opt_g
 
     def training_step(self, batch: Tuple, batch_idx: int, optimizer_idx: int) -> torch.Tensor:

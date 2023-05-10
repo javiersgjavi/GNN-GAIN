@@ -49,17 +49,17 @@
 
 
 # Tabla de modelos
-|         Modelo         | Implementado | Vertices | Pesos |
-|:----------------------:|:------------:|:--------:|:-----:|
-|       DCRNNModel       |      ✓       |    ✓     |   ✓   |
-|    GraphWaveNetModel   |      ✓       |    ✓     |   ✓   |
-| GatedGraphNetworkModel |      ✓       |    ✓     |       |
-|    RNNEncGCNDecModel   |      ✓       |    ✓     |   ✓   |
-|        STCNModel       |      ✓       |    ✓     |   ✓   |
-|       GRUGCNModel      |      ✓       |    ✓     |   ✓   |
-|       AGCRNModel       |      ✓       |          |       |
-|        GRINModel       |              |    ✓     |  ✓    |
-|     EvolveGCNModel     |              |  ✓       |   ✓   |
+|         Modelo         | Implementado | Vertices | Pesos | Paper | Búsqueda topología / pesos | Propuestos |
+|:----------------------:|:------------:|:--------:|:-----:|:-----:|:--------------------------:|:----------:|
+|       DCRNNModel       |      ✓       |    ✓     |   ✓   |   ✓   |                            |            |
+|   GraphWaveNetModel    |      ✓       |    ✓     |   ✓   |   ✓   |             ✓              |            |
+| GatedGraphNetworkModel |      ✓       |    ✓     |       |       |                            |     ✓      |
+|   RNNEncGCNDecModel    |      ✓       |    ✓     |   ✓   |       |                            |     ✓      |
+|       STCNModel        |      ✓       |    ✓     |   ✓   |       |                            |     ✓      |
+|      GRUGCNModel       |      ✓       |    ✓     |   ✓   |   ✓   |                            |     ✓      |
+|       AGCRNModel       |      ✓       |          |       |   ✓   |             ✓              |            |
+|       GRINModel        |              |    ✓     |   ✓   |   ✓   |                            |            |
+|     EvolveGCNModel     |              |    ✓     |   ✓   |   ✓   |             ✓              |            |
 <a name="about-the-project"/>
 
 ## About The Project
