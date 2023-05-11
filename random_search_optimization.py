@@ -80,8 +80,8 @@ def main(args):
     datasets = args.datasets.split(',')
     models = args.models.split(',')
     iterations = args.iterations
-    imputation_problem = args.imputation_problem
-    datasets = [f'{dataset}_{imputation_problem}' for dataset in datasets]
+    imputation_problem = args.imputation_problem.split(',')
+    datasets = [f'{dataset}_{imputation}' for dataset, imputation in zip(datasets, imputation_problem)]
 
     for dataset, model in zip(datasets, models):
         results_path = f'./results/{dataset}/'
@@ -119,7 +119,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--imputation_problem',
         help='type of imputation problem',
-        choices=['point', 'block'],
+        choices=['point', 'block', 'point,block'],
         default='point',
         type=str)
 
