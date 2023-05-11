@@ -10,9 +10,10 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 class RandomSearchExperiment:
     def __init__(self, model, dataset, iterations, results_path, accelerator='gpu',
-                 max_iter_train=10000):
+                 max_iter_train=10000, gpu='auto'):
 
         self.results_path = f'{results_path}'
+        self.selected_gpu = gpu
 
         os.makedirs(results_path, exist_ok=True)
 
@@ -65,7 +66,7 @@ class RandomSearchExperiment:
             max_steps=self.max_iter_train,
             default_root_dir='reports/logs_experiments',
             accelerator=self.accelerator,
-            devices=1,
+            devices=self.selected_gpu,
             callbacks=[EarlyStopping(monitor='mse', mode='min', patience=1000)],
         )
 

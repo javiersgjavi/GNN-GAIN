@@ -81,6 +81,7 @@ def main(args):
     models = args.models.split(',')
     iterations = args.iterations
     imputation_problem = args.imputation_problem.split(',')
+    gpu = args.gpu
     datasets = [f'{dataset}_{imputation}' for dataset, imputation in zip(datasets, imputation_problem)]
 
     for dataset, model in zip(datasets, models):
@@ -89,7 +90,8 @@ def main(args):
             model=model,
             dataset=dataset,
             iterations=iterations,
-            results_path=results_path
+            results_path=results_path,
+            gpu=[gpu]
         )
 
         random_search.run()
@@ -122,6 +124,12 @@ if __name__ == '__main__':
         choices=['point', 'block', 'point,block'],
         default='point',
         type=str)
+    parser.add_argument(
+        '--gpu',
+        help='gpu to use',
+        default='0',
+        type=int
+    )
 
     args = parser.parse_args()
 
