@@ -15,7 +15,6 @@ def main(args):
     dataset = args.dataset
     model = args.model
     miss_rate = args.miss_rate
-    batch_size = args.batch_size
     iterations = args.iterations
     imputation_problem = args.imputation_problem
     early_stopping = args.early_stopping
@@ -23,19 +22,8 @@ def main(args):
 
     accelerator = 'gpu'
 
-    # Load data
-    dm = DataModule(dataset=dataset, batch_size=batch_size, prop_missing=miss_rate)
-    edge_index, edge_weights = dm.get_connectivity()
-    normalizer = dm.get_normalizer()
-    dm.setup()
-
-    if accelerator == 'gpu':
-        edge_index = torch.from_numpy(edge_index).cuda()
-        edge_weights = torch.from_numpy(edge_weights).cuda()
-
-
     # Load hyperparameters
-    with open('./params_random_search.json') as f:
+    with open('base_params.json') as f:
         params_dict = json.load(f)
 
     hyperparameters = dict()
@@ -43,6 +31,16 @@ def main(args):
         hyperparameters[key] = params_dict[key]
 
     hyperparameters = {**hyperparameters, **params_dict[model]}
+
+    # Load data
+    dm = DataModule(dataset=dataset, batch_size=hyperparameters['batch_size'], prop_missing=miss_rate)
+    edge_index, edge_weights = dm.get_connectivity()
+    normalizer = dm.get_normalizer()
+    dm.setup()
+
+    if accelerator == 'gpu':
+        edge_index = torch.from_numpy(edge_index).cuda()
+        edge_weights = torch.from_numpy(edge_weights).cuda()
 
     if early_stopping != 0:
         callbacks = [EarlyStopping(monitor='denorm_mse', patience=early_stopping, mode='min')]
@@ -64,10 +62,9 @@ def main(args):
         Dataset: {dataset}
         Model: {model}
         Missing rate: {miss_rate}
-        Batch size: {batch_size}
         Iterations: {iterations}
         Hyperparameters: {hyperparameters}
-        
+
         Generator: {model.generator}
         Discriminator: {model.discriminator}
         ---------------------------------------------------------------
@@ -107,11 +104,6 @@ if __name__ == '__main__':
         help='missing data probability',
         default=0.25,
         type=float)
-    parser.add_argument(
-        '--batch_size',
-        help='the number of samples in mini-batch',
-        default=64,
-        type=int)
     parser.add_argument(
         '--iterations',
         help='number of training iterations',
