@@ -45,9 +45,9 @@ def main(args):
     hyperparameters = {**hyperparameters, **params_dict[model]}
 
     if early_stopping != 0:
-        early_stopping = EarlyStopping(monitor='denorm_mse', patience=early_stopping, mode='min')
+        callbacks = [EarlyStopping(monitor='denorm_mse', patience=early_stopping, mode='min')]
     else:
-        early_stopping = None
+        callbacks = None
 
     # Load model
     model = GAIN(
@@ -81,7 +81,7 @@ def main(args):
         logger=exp_logger,
         accelerator=accelerator,
         devices=1,
-        callbacks=[early_stopping],
+        callbacks=callbacks,
     )
 
     trainer.fit(model, datamodule=dm)
