@@ -89,9 +89,10 @@ def main(args):
         random_search = RandomSearchExperiment(
             model=model,
             dataset=dataset,
-            iterations=iterations,
+            iterations=10000,
             results_path=results_path,
-            gpu=[gpu]
+            gpu=[gpu],
+            max_iter_train=iterations,
         )
 
         random_search.run()
@@ -115,8 +116,8 @@ if __name__ == '__main__':
         type=str)
     parser.add_argument(
         '--iterations',
-        help='number of training iterations',
-        default=1000,
+        help='number of iterations for the random search',
+        default=300,
         type=int)
     parser.add_argument(
         '--imputation_problem',
