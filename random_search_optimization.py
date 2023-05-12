@@ -84,18 +84,19 @@ def main(args):
     gpu = args.gpu
     datasets = [f'{dataset}_{imputation}' for dataset, imputation in zip(datasets, imputation_problem)]
 
-    for dataset, model in zip(datasets, models):
-        results_path = f'./results/{dataset}/'
-        random_search = RandomSearchExperiment(
-            model=model,
-            dataset=dataset,
-            iterations=iterations,
-            results_path=results_path,
-            gpu=[gpu],
-            max_iter_train=5000,
-        )
+    for dataset in datasets:
+        for model in models:
+            results_path = f'./results/{dataset}/'
+            random_search = RandomSearchExperiment(
+                model=model,
+                dataset=dataset,
+                iterations=iterations,
+                results_path=results_path,
+                gpu=[gpu],
+                max_iter_train=5000,
+            )
 
-        random_search.run()
+            random_search.run()
 
     make_summary_dataset(datasets, models)
     make_summary_general(datasets)
