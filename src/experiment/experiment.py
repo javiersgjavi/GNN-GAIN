@@ -9,9 +9,16 @@ from src.data.datasets import DataModule
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
+
+def print_dict(dictionary, max_iter_train):
+    for key, value in dictionary.items():
+        print(f'{key}: {value}')
+    print(f'Max steps training: {max_iter_train}')
+
+
 class RandomSearchExperiment:
     def __init__(self, model, dataset, iterations, results_path, accelerator='gpu',
-                 max_iter_train=10000, gpu='auto'):
+                 max_iter_train=5000, gpu='auto'):
 
         self.results_path = f'{results_path}'
         self.selected_gpu = gpu
@@ -40,6 +47,8 @@ class RandomSearchExperiment:
         self.params_loader = RandomSearchLoader(model, iterations)
         self.accelerator = accelerator
         self.max_iter_train = max_iter_train
+        self.dm, self.edge_index, self.edge_weights, self.normalizer = self.prepare_data(
+            self.params_loader.random_params['batch_size'][0][0])
 
     def prepare_data(self, batch_size):
         dm = DataModule(dataset=self.dataset, batch_size=batch_size)
@@ -68,7 +77,7 @@ class RandomSearchExperiment:
             default_root_dir='reports/logs_experiments',
             accelerator=self.accelerator,
             devices=self.selected_gpu,
-            callbacks=[EarlyStopping(monitor='denorm_mse', mode='min', patience=2)],
+            callbacks=[EarlyStopping(monitor='denorm_mse', patience=1, mode='min')],
         )
 
         trainer.fit(model, datamodule=dm)
@@ -93,8 +102,9 @@ class RandomSearchExperiment:
 
     def run(self):
 
-        for i in tqdm(range(self.results_file.shape[0], self.max_iter_train), desc=f'Random Search with {self.model} in {self.dataset}'):
+        for i in tqdm(range(self.results_file.shape[0], self.iterations),
+                      desc=f'Random Search with {self.model} in {self.dataset}'):
             hyperparameters = self.params_loader.get_params(i)
-            dm, edge_index, edge_weights, normalizer = self.prepare_data(hyperparameters['batch_size'][0])
-            results = self.train_test(dm, edge_index, edge_weights, normalizer, hyperparameters)
+            print_dict(hyperparameters, self.max_iter_train)
+            results = self.train_test(self.dm, self.edge_index, self.edge_weights, self.normalizer, hyperparameters)
             self.save_results(results, hyperparameters)

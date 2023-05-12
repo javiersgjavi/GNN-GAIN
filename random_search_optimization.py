@@ -89,10 +89,10 @@ def main(args):
         random_search = RandomSearchExperiment(
             model=model,
             dataset=dataset,
-            iterations=10000,
+            iterations=iterations,
             results_path=results_path,
             gpu=[gpu],
-            max_iter_train=iterations,
+            max_iter_train=5000,
         )
 
         random_search.run()
