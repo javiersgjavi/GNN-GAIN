@@ -11,7 +11,7 @@ class RandomSearchLoader:
         self.n_iter = n_iter
         self.model_name = model_name
 
-        with open('src/experiment/params.json') as f:
+        with open('src/experiment/params_random_search.json') as f:
             self.params_grid = json.load(f)
 
         self.random_params = self.load_params_grid(n_iter)

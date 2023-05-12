@@ -111,7 +111,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--models',
         help='models to optimize',
-        default='stcn,grugcn,rnngcn,ggn',
+        default='grugcn,rnngcn,stcn,ggn',
         type=str)
     parser.add_argument(
         '--iterations',

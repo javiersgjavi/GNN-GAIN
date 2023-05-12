@@ -1,12 +1,13 @@
 import os
+import json
 import torch
 import pandas as pd
+from tqdm import tqdm
 from src.experiment.params_optimizer import RandomSearchLoader
 from src.models.gain import GAIN
 from src.data.datasets import DataModule
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
-
 
 class RandomSearchExperiment:
     def __init__(self, model, dataset, iterations, results_path, accelerator='gpu',
@@ -22,13 +23,13 @@ class RandomSearchExperiment:
 
         else:
             columns = [
-                'mse',
                 'mae',
+                'mse',
                 'rmse',
-                'denorm_mse',
                 'denorm_mae',
-                'denorm_rmse',
+                'denorm_mse',
                 'denorm_mre',
+                'denorm_rmse',
                 'params'
             ]
             self.results_file = pd.DataFrame(columns=columns)
@@ -67,7 +68,7 @@ class RandomSearchExperiment:
             default_root_dir='reports/logs_experiments',
             accelerator=self.accelerator,
             devices=self.selected_gpu,
-            callbacks=[EarlyStopping(monitor='mse', mode='min', patience=1000)],
+            callbacks=[EarlyStopping(monitor='denorm_mse', mode='min', patience=2)],
         )
 
         trainer.fit(model, datamodule=dm)
@@ -77,13 +78,13 @@ class RandomSearchExperiment:
 
     def save_results(self, results, params):
         row = [
-            results['mse'],
             results['mae'],
+            results['mse'],
             results['rmse'],
-            results['denorm_mse'],
             results['denorm_mae'],
-            results['denorm_rmse'],
+            results['denorm_mse'],
             results['denorm_mre'],
+            results['denorm_rmse'],
             params,
         ]
 
@@ -92,7 +93,7 @@ class RandomSearchExperiment:
 
     def run(self):
 
-        for i in range(self.results_file.shape[0], self.iterations):
+        for i in tqdm(range(self.results_file.shape[0], self.iterations), desc=f'Random Search with {self.model} in {self.dataset}'):
             hyperparameters = self.params_loader.get_params(i)
             dm, edge_index, edge_weights, normalizer = self.prepare_data(hyperparameters['batch_size'][0])
             results = self.train_test(dm, edge_index, edge_weights, normalizer, hyperparameters)
