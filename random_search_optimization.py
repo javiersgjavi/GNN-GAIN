@@ -106,7 +106,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--datasets',
-        choices=['la', 'electric', 'air', 'air-36', 'bay'],
         default='la,air,air-36,bay',
         type=str)
     parser.add_argument(
