@@ -93,7 +93,7 @@ class RandomSearchExperiment:
 
     def run(self):
 
-        for i in tqdm(range(self.results_file.shape[0], self.iterations), desc=f'Random Search with {self.model} in {self.dataset}'):
+        for i in tqdm(range(self.results_file.shape[0], self.max_iter_train), desc=f'Random Search with {self.model} in {self.dataset}'):
             hyperparameters = self.params_loader.get_params(i)
             dm, edge_index, edge_weights, normalizer = self.prepare_data(hyperparameters['batch_size'][0])
             results = self.train_test(dm, edge_index, edge_weights, normalizer, hyperparameters)
