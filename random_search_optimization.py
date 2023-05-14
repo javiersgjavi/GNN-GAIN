@@ -36,7 +36,7 @@ def make_summary_dataset(datasets, models):
             ]
             result_file.loc[len(result_file)] = row
 
-        result_file.to_csv(f'{results_path}/{dataset}/results.csv', index=False)
+        result_file.to_csv(f'{results_path}/results.csv', index=False)
 
 
 def make_summary_general(datasets):
