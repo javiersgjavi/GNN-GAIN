@@ -1,3 +1,4 @@
+import itertools
 import pandas as pd
 import argparse
 from src.experiment.experiment import RandomSearchExperiment
@@ -82,9 +83,9 @@ def main(args):
     iterations = args.iterations
     imputation_problem = args.imputation_problem.split(',')
     gpu = args.gpu
-    datasets = [f'{dataset}_{imputation}' for dataset, imputation in zip(datasets, imputation_problem)]
+    datasets = [f'{dataset}_{imputation}' for dataset, imputation in itertools.product(datasets, imputation_problem)]
 
-    for dataset in datasets:
+    for dataset, model in itertools.product(datasets, models):
         for model in models:
             results_path = f'./results/{dataset}/'
             random_search = RandomSearchExperiment(
