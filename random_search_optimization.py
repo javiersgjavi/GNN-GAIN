@@ -21,7 +21,7 @@ def make_summary_dataset(datasets, models):
         results_path = f'./results/{dataset}/'
         result_file = pd.DataFrame(columns=columns)
         for model in models:
-            results_model = pd.read_csv(f'{results_path}/{model}_results.csv')
+            results_model = pd.read_csv(f'{results_path}{model}_results.csv')
             best_result = results_model.iloc[results_model['mse'].idxmin()]
             row = [
                 model,
@@ -43,38 +43,37 @@ def make_summary_general(datasets):
     columns = [
         'dataset',
         'model',
-        'mse',
         'mae',
+        'mse',
         'rmse',
-        'denorm_mse',
         'denorm_mae',
-        'denorm_rmse',
+        'denorm_mse',
         'denorm_mre',
+        'denorm_rmse',
         'params'
     ]
-    results_path = f'./results/results.csv'
     result_file = pd.DataFrame(columns=columns)
 
     for dataset in datasets:
         results_dataset_path = f'./results/{dataset}/results.csv'
-        results_dataset = pd.read_csv(results_dataset_path, index_col='Unnamed: 0')
+        results_dataset = pd.read_csv(results_dataset_path)
 
         best_result = results_dataset.iloc[results_dataset['mse'].idxmin()]
         row = [
             dataset,
             best_result['model'],
-            best_result['mse'],
             best_result['mae'],
+            best_result['mse'],
             best_result['rmse'],
-            best_result['denorm_mse'],
             best_result['denorm_mae'],
-            best_result['denorm_rmse'],
+            best_result['denorm_mse'],
             best_result['denorm_mre'],
+            best_result['denorm_rmse'],
             best_result['params']
         ]
         result_file.loc[len(result_file)] = row
 
-    result_file.to_csv(f'{results_path}/results.csv', index=False)
+    result_file.to_csv(f'./results/results.csv', index=False)
 
 
 def main(args):
@@ -84,6 +83,8 @@ def main(args):
     imputation_problem = args.imputation_problem.split(',')
     gpu = args.gpu
     datasets = [f'{dataset}_{imputation}' for dataset, imputation in itertools.product(datasets, imputation_problem)]
+
+    '''
 
     for dataset, model in itertools.product(datasets, models):
         for model in models:
@@ -97,7 +98,7 @@ def main(args):
                 max_iter_train=5000,
             )
 
-            random_search.run()
+            random_search.run()'''
 
     make_summary_dataset(datasets, models)
     make_summary_general(datasets)
