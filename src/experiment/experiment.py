@@ -23,6 +23,7 @@ class RandomSearchExperiment:
         self.results_path = f'{results_path}'
         self.selected_gpu = gpu
 
+
         os.makedirs(results_path, exist_ok=True)
 
         if os.path.exists(f'{results_path}/{model}_results.csv'):
@@ -57,8 +58,8 @@ class RandomSearchExperiment:
         dm.setup()
 
         if self.accelerator == 'gpu':
-            edge_index = torch.from_numpy(edge_index).cuda()
-            edge_weights = torch.from_numpy(edge_weights).cuda()
+            edge_index = torch.from_numpy(edge_index).to(f'cuda:{self.selected_gpu[0]}')
+            edge_weights = torch.from_numpy(edge_weights).to(f'cuda:{self.selected_gpu[0]}')
 
         return dm, edge_index, edge_weights, normalizer
 
