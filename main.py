@@ -19,6 +19,7 @@ def main(args):
     imputation_problem = args.imputation_problem
     early_stopping = args.early_stopping
     dataset = f'{dataset}_{imputation_problem}'
+    use_time_gap_matrix = True
 
     accelerator = 'gpu'
 
@@ -26,14 +27,20 @@ def main(args):
     with open('base_params.json') as f:
         params_dict = json.load(f)
 
-    hyperparameters = dict()
+    hyperparameters = {'use_time_gap_matrix': use_time_gap_matrix}
     for key in ['batch_size', 'learning_rate', 'activation', 'hidden_size']:
         hyperparameters[key] = params_dict[key]
 
     hyperparameters = {**hyperparameters, **params_dict[model]}
 
     # Load data
-    dm = DataModule(dataset=dataset, batch_size=hyperparameters['batch_size'], prop_missing=miss_rate)
+    dm = DataModule(
+        dataset=dataset,
+        batch_size=hyperparameters['batch_size'],
+        prop_missing=miss_rate,
+        use_time_gap_matrix=use_time_gap_matrix
+    )
+
     edge_index, edge_weights = dm.get_connectivity()
     normalizer = dm.get_normalizer()
     dm.setup()

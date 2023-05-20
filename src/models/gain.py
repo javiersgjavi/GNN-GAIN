@@ -86,10 +86,13 @@ class GAIN(pl.LightningModule):
         self.args = {**args, **params}
 
         # Three main components of the GAIN model
-        self.generator = model_class[model_type](self.args)
+
+        self.use_time_gap = params['use_time_gap_matrix']
+        self.generator = model_class[model_type](self.args, time_gap_matrix=self.use_time_gap)
         self.discriminator = model_class[model_type](self.args)
 
         self.hint_generator = HintGenerator(prop_hint=hint_rate)
+
 
     # -------------------- Custom methods --------------------
 
@@ -183,10 +186,10 @@ class GAIN(pl.LightningModule):
             A dictionary containing the output tensors of the generator and discriminator for the batch, as well as the
             real input and the input mask.
         """
-        x, x_real, input_mask_bool, input_mask_int, known_values = batch
+        x, x_real, input_mask_bool, input_mask_int, known_values, time_gap_matrix = batch
 
         # Forward Generator
-        x_fake, imputation = self.generator.forward_g(x=x, input_mask=input_mask_int)
+        x_fake, imputation = self.generator.forward_g(x=x, input_mask=input_mask_int, time_gap_matrix=time_gap_matrix)
 
         # Generate Hint Matrix
         hint_matrix = self.hint_generator.generate(input_mask_int)

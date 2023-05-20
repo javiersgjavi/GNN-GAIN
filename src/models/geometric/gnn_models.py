@@ -12,7 +12,7 @@ class BaseGNN(nn.Module):
         self.edge_weights = edge_weights
         self.model = None
 
-    def forward_g(self, x: torch.Tensor, input_mask: torch.Tensor) -> Tuple[Tensor, Tensor]:
+    def forward_g(self, x: torch.Tensor, input_mask: torch.Tensor, time_gap_matrix: torch.Tensor) -> Tuple[Tensor, Tensor]:
         """
         The forward pass of the generator network.
 
@@ -30,7 +30,11 @@ class BaseGNN(nn.Module):
         # Concatenate the input tensor with the noise matrix
         x = input_mask * x + (1 - input_mask) * noise_matrix
 
-        input_tensor = torch.stack([x, input_mask]).permute(1, 2, 3, 0)
+        if self.time_gap_matrix:
+            input_tensor = torch.stack([x, input_mask, time_gap_matrix]).permute(1, 2, 3, 0)
+        else:
+            input_tensor = torch.stack([x, input_mask]).permute(1, 2, 3, 0)
+
         imputation = self.model(input_tensor, self.edge_index, self.edge_weights).squeeze(dim=-1)
 
         imputation = torch.sigmoid(imputation)
@@ -59,12 +63,14 @@ class BaseGNN(nn.Module):
 
 class STCN(BaseGNN):
 
-    def __init__(self, args):
+    def __init__(self, args, time_gap_matrix=False):
         super().__init__(edge_index=args['edge_index'], edge_weights=args['edge_weights'])
+
+        self.time_gap_matrix = time_gap_matrix
 
         self.model = STCNModel(
             exog_size=0,
-            input_size=2,
+            input_size=2 if not self.time_gap_matrix else 3,
             output_size=1,
             hidden_size=args['periods'],
             horizon=args['periods'],
@@ -78,12 +84,14 @@ class STCN(BaseGNN):
 
 class GRUGCN(BaseGNN):
 
-    def __init__(self, args):
+    def __init__(self, args, time_gap_matrix=False):
         super().__init__(edge_index=args['edge_index'], edge_weights=args['edge_weights'])
+
+        self.time_gap_matrix = time_gap_matrix
 
         self.model = GRUGCNModel(
             exog_size=0,
-            input_size=2,
+            input_size=2 if not self.time_gap_matrix else 3,
             output_size=1,
             hidden_size=int(args['periods'] * args['hidden_size']),
             horizon=args['periods'],
@@ -96,12 +104,14 @@ class GRUGCN(BaseGNN):
 
 class RNNEncGCNDec(BaseGNN):
 
-    def __init__(self, args):
+    def __init__(self, args, time_gap_matrix=False):
         super().__init__(edge_index=args['edge_index'], edge_weights=args['edge_weights'])
+
+        self.time_gap_matrix = time_gap_matrix
 
         self.model = RNNEncGCNDecModel(
             exog_size=0,
-            input_size=2,
+            input_size=2 if not self.time_gap_matrix else 3,
             output_size=1,
             hidden_size=int(args['periods'] * args['hidden_size']),
             horizon=args['periods'],
@@ -116,13 +126,15 @@ class RNNEncGCNDec(BaseGNN):
 
 class GatedGraphNetwork(BaseGNN):
 
-    def __init__(self, args):
+    def __init__(self, args, time_gap_matrix=False):
         """AVISO: Este modelo no usa los pesos, simplemente recibe los vertices"""
         super().__init__(edge_index=args['edge_index'], edge_weights=None)
 
+        self.time_gap_matrix = time_gap_matrix
+
         self.model = GatedGraphNetworkModel(
             exog_size=0,
-            input_size=2,
+            input_size=2 if not self.time_gap_matrix else 3,
             output_size=1,
             hidden_size=int(args['periods'] * args['hidden_size']),
             input_window_size=args['periods'],

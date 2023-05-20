@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torch import nn
+from tqdm import tqdm
 from typing import Tuple
 from tsl.ops.imputation import add_missing_values
 
@@ -21,7 +22,7 @@ def init_weights_xavier(m: nn.Module) -> None:
             m.bias.data.fill_(0.01)
 
 
-def create_windows_from_sequence(data, mask, known_values, window_len=12, stride=1):
+def create_windows_from_sequence(data, mask, known_values, time_gap_matrix, window_len=12, stride=1):
     """
     Create windows from a sequence.
 
@@ -35,6 +36,7 @@ def create_windows_from_sequence(data, mask, known_values, window_len=12, stride
     windows = []
     windows_mask = []
     windows_known_values = []
+    windows_time_gap_matrix = []
 
     if len(mask.shape) == 3:
         mask = mask[:, :, 0]
@@ -44,8 +46,9 @@ def create_windows_from_sequence(data, mask, known_values, window_len=12, stride
         windows.append(data[i:i + window_len])
         windows_mask.append(mask[i:i + window_len])
         windows_known_values.append(known_values[i:i + window_len])
+        windows_time_gap_matrix.append(time_gap_matrix[i:i + window_len])
 
-    return np.array(windows), np.array(windows_mask), np.array(windows_known_values)
+    return np.array(windows), np.array(windows_mask), np.array(windows_known_values), np.array(windows_time_gap_matrix)
 
 
 def generate_uniform_noise(tensor_like, low=0, high=0.01):
@@ -64,6 +67,23 @@ def mean_relative_error(x: np.array, y: np.array) -> np.array:
         np.array: Mean relative error
     """
     return np.mean(np.abs(x - y) / np.abs(y)) * 100
+
+
+def count_missing_sequences(matriz, max_time_gap=24):
+    print(matriz.shape)
+    rows, nodes = matriz.shape[:2]
+    res = np.zeros_like(matriz)
+    for n in tqdm(range(nodes), desc='Counting missing sequences'):
+        current_sequence = 0
+        for r in range(rows):
+            if matriz[r, n, 0] == 0:
+                if current_sequence < max_time_gap:
+                    current_sequence += 1
+                res[r, n, 0] = current_sequence
+            else:
+                current_sequence = 0
+
+    return np.array(res)[:, :, 0]
 
 
 def loss_d(d_prob: torch.Tensor, m: torch.Tensor) -> torch.Tensor:
