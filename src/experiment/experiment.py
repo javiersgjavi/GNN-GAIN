@@ -64,6 +64,7 @@ class RandomSearchExperiment:
         return dm, edge_index, edge_weights, normalizer
 
     def train_test(self, dm, edge_index, edge_weights, normalizer, hyperparameters):
+        hyperparameters['use_time_gap_matrix'] = True
         model = GAIN(
             model_type=self.model,
             input_size=dm.input_size(),
