@@ -52,7 +52,7 @@ class RandomSearchExperiment:
             self.params_loader.random_params['batch_size'][0][0])
 
     def prepare_data(self, batch_size):
-        dm = DataModule(dataset=self.dataset, batch_size=batch_size)
+        dm = DataModule(dataset=self.dataset, batch_size=batch_size, use_time_gap_matrix=True)
         edge_index, edge_weights = dm.get_connectivity()
         normalizer = dm.get_normalizer()
         dm.setup()

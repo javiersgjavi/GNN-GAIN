@@ -70,20 +70,20 @@ def mean_relative_error(x: np.array, y: np.array) -> np.array:
 
 
 def count_missing_sequences(matriz, max_time_gap=24):
-    print(matriz.shape)
     rows, nodes = matriz.shape[:2]
-    res = np.zeros_like(matriz)
+    res = np.zeros_like(matriz).astype(np.float32)
+    norm_values = {i: i/max_time_gap for i in range(max_time_gap+1)}
     for n in tqdm(range(nodes), desc='Counting missing sequences'):
         current_sequence = 0
         for r in range(rows):
             if matriz[r, n, 0] == 0:
                 if current_sequence < max_time_gap:
                     current_sequence += 1
-                res[r, n, 0] = current_sequence
+                res[r, n, 0] = norm_values[current_sequence]
             else:
                 current_sequence = 0
 
-    return np.array(res)[:, :, 0]
+    return res[:, :, 0]
 
 
 def loss_d(d_prob: torch.Tensor, m: torch.Tensor) -> torch.Tensor:

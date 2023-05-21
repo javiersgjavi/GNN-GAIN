@@ -137,7 +137,6 @@ class DataModule(pl.LightningModule):
                 else:
 
                     time_gap_matrix = count_missing_sequences(base_data.training_mask.astype(int))
-                    time_gap_matrix = MinMaxScaler().fit_transform(time_gap_matrix).astype(np.float32)
                     np.save(path_time_gap_matrix, time_gap_matrix)
 
 
@@ -156,7 +155,6 @@ class DataModule(pl.LightningModule):
                     time_gap_matrix = np.load(path_time_gap_matrix)
                 else:
                     time_gap_matrix = count_missing_sequences(base_data.training_mask.astype(int))
-                    time_gap_matrix = MinMaxScaler().fit_transform(time_gap_matrix).astype(np.float32)
                     np.save(path_time_gap_matrix, time_gap_matrix)
 
         elif dataset.startswith('air'):
