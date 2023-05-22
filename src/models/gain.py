@@ -5,7 +5,7 @@ from typing import Dict, Tuple
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from torchmetrics import MeanAbsoluteError
 
-from src.models.geometric.gnn_models import STCN, GRUGCN, RNNEncGCNDec, GatedGraphNetwork
+from src.models.geometric.gnn_models_bi import STCN, GRUGCN, RNNEncGCNDec, GatedGraphNetwork
 
 from src.models.mlp import MLP
 
