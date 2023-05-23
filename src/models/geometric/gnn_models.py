@@ -1,7 +1,7 @@
 import torch
 from typing import Tuple
 from torch import nn, Tensor
-from tsl.nn.models import GatedGraphNetworkModel, RNNEncGCNDecModel, GRUGCNModel, STCNModel
+from tsl.nn.models import GatedGraphNetworkModel, RNNEncGCNDecModel, GRUGCNModel, STCNModel, DCRNNModel
 from src.utils import init_weights_xavier, generate_uniform_noise
 
 
@@ -143,4 +143,24 @@ class GatedGraphNetwork(BaseGNN):
             enc_layers=args['enc_layers'],
             gnn_layers=args['gnn_layers'],
             full_graph=args['full_graph']
+        ).apply(init_weights_xavier)
+
+class DCRNN(BaseGNN):
+
+    def __init__(self, args, time_gap_matrix=False):
+        super().__init__(edge_index=args['edge_index'], edge_weights=args['edge_weights'])
+
+        self.time_gap_matrix = time_gap_matrix
+
+        self.model = DCRNNModel(
+            exog_size=0,
+            input_size=2 if not self.time_gap_matrix else 3,
+            output_size=1,
+            hidden_size=int(args['periods'] * args['hidden_size']),
+            horizon=args['periods'],
+            kernel_size=args['kernel_size'],
+            ff_size=int(args['periods'] * args['hidden_size']),
+            n_layers=args['n_layers'],
+            dropout=args['dropout'],
+            activation=args['activation']
         ).apply(init_weights_xavier)

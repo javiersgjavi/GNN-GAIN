@@ -55,6 +55,11 @@ class RandomSearchLoader:
             params_dict['gcn_layers'] = randint_close_interval(*params_grid_model['gcn_layers'], size=n_iter)
             params_dict['norm'] = choice(params_grid_model['norm'], size=n_iter)
 
+        elif self.model_name == 'dcrnn':
+            params_dict['kernel_size'] = randint_close_interval(*params_grid_model['enc_layers'], size=n_iter)
+            params_dict['n_layers'] = randint_close_interval(*params_grid_model['gcn_layers'], size=n_iter)
+            params_dict['dropout'] = uniform(*params_grid_model['rnn_dropout'], size=n_iter)
+
         return params_dict
 
     def get_params(self, i):

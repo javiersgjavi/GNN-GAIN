@@ -5,7 +5,7 @@ from typing import Dict, Tuple
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from torchmetrics import MeanAbsoluteError
 
-from src.models.geometric.gnn_models_bi import STCN, GRUGCN, RNNEncGCNDec, GatedGraphNetwork
+from src.models.geometric.gnn_models import STCN, GRUGCN, RNNEncGCNDec, GatedGraphNetwork, DCRNN
 
 from src.models.mlp import MLP
 
@@ -67,6 +67,7 @@ class GAIN(pl.LightningModule):
             'grugcn': GRUGCN,
             'rnngcn': RNNEncGCNDec,
             'ggn': GatedGraphNetwork,
+            'dcrnn': DCRNN,
             'mlp': MLP
         }
 
@@ -92,7 +93,6 @@ class GAIN(pl.LightningModule):
         self.discriminator = model_class[model_type](self.args)
 
         self.hint_generator = HintGenerator(prop_hint=hint_rate)
-
 
     # -------------------- Custom methods --------------------
 

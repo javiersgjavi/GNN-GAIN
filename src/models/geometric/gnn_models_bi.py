@@ -1,7 +1,7 @@
 import torch
 from typing import Tuple
 from torch import nn, Tensor
-from tsl.nn.models import GatedGraphNetworkModel, RNNEncGCNDecModel, GRUGCNModel, STCNModel
+from tsl.nn.models import GatedGraphNetworkModel, RNNEncGCNDecModel, GRUGCNModel, STCNModel, DCRNNModel
 from src.utils import init_weights_xavier, generate_uniform_noise
 
 
@@ -42,7 +42,6 @@ class BaseGNN(nn.Module):
             input_tensor = torch.stack([x, input_mask, time_gap_matrix]).permute(1, 2, 3, 0)
         else:
             input_tensor = torch.stack([x, input_mask]).permute(1, 2, 3, 0)
-
 
         imputation = self.bi_forward(input_tensor, self.edge_index, self.edge_weights).squeeze(dim=-1)
 
@@ -169,4 +168,26 @@ class GatedGraphNetwork(BaseGNN):
             enc_layers=args['enc_layers'],
             gnn_layers=args['gnn_layers'],
             full_graph=args['full_graph']
+        ).apply(init_weights_xavier)
+
+
+class DCRNN(BaseGNN):
+
+    def __init__(self, args, time_gap_matrix=False):
+        """AVISO: Este modelo no usa los pesos, simplemente recibe los vertices"""
+        super().__init__(edge_index=args['edge_index'], edge_weights=None)
+
+        self.time_gap_matrix = time_gap_matrix
+
+        self.model = DCRNNModel(
+            exog_size=0,
+            input_size=2 if not self.time_gap_matrix else 3,
+            output_size=1,
+            hidden_size=int(args['periods'] * args['hidden_size']),
+            horizon=args['periods'],
+            kernel_size=args['kernel_size'],
+            ff_size=int(args['periods'] * args['hidden_size']),
+            n_layers=args['n_layers'],
+            dropout=args['dropout'],
+            activation=args['activation']
         ).apply(init_weights_xavier)

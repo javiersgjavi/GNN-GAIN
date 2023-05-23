@@ -125,7 +125,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--model',
         help='type of model',
-        choices=['grugcn', 'rnngcn', 'stcn', 'ggn'],
+        choices=['grugcn', 'rnngcn', 'stcn', 'ggn', 'dcrnn'],
         default='rnngcn',
         type=str)
     parser.add_argument(
