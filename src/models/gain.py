@@ -6,6 +6,7 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error
 from torchmetrics import MeanAbsoluteError
 
 from src.models.geometric.gnn_models import STCN, GRUGCN, RNNEncGCNDec, GatedGraphNetwork, DCRNN
+from src.models.geometric.gnn_models_bi import STCNBI, GRUGCNBI, RNNEncGCNDecBI, GatedGraphNetworkBI, DCRNNBI
 
 from src.models.mlp import MLP
 
@@ -71,6 +72,16 @@ class GAIN(pl.LightningModule):
             'mlp': MLP
         }
 
+        model_class_bi = {
+            'stcn': STCNBI,
+            'grugcn': GRUGCNBI,
+            'rnngcn': RNNEncGCNDecBI,
+            'ggn': GatedGraphNetworkBI,
+            'dcrnn': DCRNNBI,
+        }
+
+        model = model_class_bi[model_type] if params['bi'] else model_class[model_type]
+
         self.alpha = alpha
         self.nodes = input_size[1]
         self.normalizer = normalizer
@@ -89,8 +100,8 @@ class GAIN(pl.LightningModule):
         # Three main components of the GAIN model
 
         self.use_time_gap = params['use_time_gap_matrix']
-        self.generator = model_class[model_type](self.args, time_gap_matrix=self.use_time_gap)
-        self.discriminator = model_class[model_type](self.args)
+        self.generator = model(self.args, time_gap_matrix=self.use_time_gap)
+        self.discriminator = model(self.args)
 
         self.hint_generator = HintGenerator(prop_hint=hint_rate)
 

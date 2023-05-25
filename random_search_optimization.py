@@ -22,7 +22,7 @@ def make_summary_dataset(datasets, models):
         result_file = pd.DataFrame(columns=columns)
         for model in models:
             results_model = pd.read_csv(f'{results_path}{model}_results.csv')
-            best_result = results_model.iloc[results_model['mse'].idxmin()]
+            best_result = results_model.iloc[results_model['mae'].idxmin()]
             row = [
                 model,
                 best_result['mse'],
@@ -58,7 +58,7 @@ def make_summary_general(datasets):
         results_dataset_path = f'./results/{dataset}/results.csv'
         results_dataset = pd.read_csv(results_dataset_path)
 
-        best_result = results_dataset.iloc[results_dataset['mse'].idxmin()]
+        best_result = results_dataset.iloc[results_dataset['mae'].idxmin()]
         row = [
             dataset,
             best_result['model'],
@@ -82,6 +82,7 @@ def main(args):
     iterations = args.iterations
     imputation_problem = args.imputation_problem.split(',')
     gpu = args.gpu
+    bi = bool(args.bi)
     datasets = [f'{dataset}_{imputation}' for dataset, imputation in itertools.product(datasets, imputation_problem)]
 
     for dataset, model in itertools.product(datasets, models):
@@ -93,6 +94,7 @@ def main(args):
             results_path=results_path,
             gpu=[gpu],
             max_iter_train=5000,
+            bi=bi
         )
 
         random_search.run()
@@ -127,6 +129,13 @@ if __name__ == '__main__':
     parser.add_argument(
         '--gpu',
         help='gpu to use',
+        default='0',
+        type=int
+    )
+    parser.add_argument(
+        '--bi',
+        help='If the model is bidirectional',
+        choices=[0, 1],
         default='0',
         type=int
     )

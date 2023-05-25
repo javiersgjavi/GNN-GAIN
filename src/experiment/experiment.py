@@ -18,7 +18,7 @@ def print_dict(dictionary, max_iter_train):
 
 class RandomSearchExperiment:
     def __init__(self, model, dataset, iterations, results_path, accelerator='gpu',
-                 max_iter_train=5000, gpu='auto'):
+                 max_iter_train=5000, gpu='auto', bi=False):
 
         self.results_path = f'{results_path}'
         self.selected_gpu = gpu
@@ -42,10 +42,11 @@ class RandomSearchExperiment:
             ]
             self.results_file = pd.DataFrame(columns=columns)
 
+        self.bi = bi
         self.model = model
-        self.iterations = iterations
         self.dataset = dataset
-        self.params_loader = RandomSearchLoader(model, iterations)
+        self.iterations = iterations
+        self.params_loader = RandomSearchLoader(model, iterations, bi=self.bi)
         self.accelerator = accelerator
         self.max_iter_train = max_iter_train
         self.dm, self.edge_index, self.edge_weights, self.normalizer = self.prepare_data(
@@ -65,6 +66,7 @@ class RandomSearchExperiment:
 
     def train_test(self, dm, edge_index, edge_weights, normalizer, hyperparameters):
         hyperparameters['use_time_gap_matrix'] = True
+        hyperparameters['bi'] = self.bi
         model = GAIN(
             model_type=self.model,
             input_size=dm.input_size(),

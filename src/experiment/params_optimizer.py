@@ -7,11 +7,14 @@ def randint_close_interval(low, high, size=None):
 
 
 class RandomSearchLoader:
-    def __init__(self, model_name, n_iter):
+    def __init__(self, model_name, n_iter, bi=False):
         self.n_iter = n_iter
         self.model_name = model_name
+        self.bi = bi
 
-        with open('src/experiment/params_random_search.json') as f:
+        file = 'params_random_search.json' if not self.bi else 'params_random_search_bi.json'
+
+        with open(f'src/experiment/{file}') as f:
             self.params_grid = json.load(f)
 
         self.random_params = self.load_params_grid(n_iter)
@@ -40,6 +43,10 @@ class RandomSearchLoader:
             params_dict['gcn_dropout'] = uniform(*params_grid_model['gcn_dropout'], size=n_iter)
 
             params_dict['cell_type'] = choice(params_grid_model['cell_type'], size=n_iter)
+
+            if self.bi:
+                params_dict['mlp_h'] = randint_close_interval(*params_grid_model['mlp_h'], size=n_iter)
+                params_dict['mlp_layers'] = randint_close_interval(*params_grid_model['mlp_layers'], size=n_iter)
 
         elif self.model_name == 'stcn':
 
