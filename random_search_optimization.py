@@ -83,6 +83,7 @@ def main(args):
     imputation_problem = args.imputation_problem.split(',')
     gpu = args.gpu
     bi = bool(args.bi)
+    time_gap = bool(args.time_gap)
     datasets = [f'{dataset}_{imputation}' for dataset, imputation in itertools.product(datasets, imputation_problem)]
 
     for dataset, model in itertools.product(datasets, models):
@@ -94,7 +95,8 @@ def main(args):
             results_path=results_path,
             gpu=[gpu],
             max_iter_train=5000,
-            bi=bi
+            bi=bi,
+            time_gap=time_gap
         )
 
         random_search.run()
@@ -135,6 +137,13 @@ if __name__ == '__main__':
     parser.add_argument(
         '--bi',
         help='If the model is bidirectional',
+        choices=[0, 1],
+        default='0',
+        type=int
+    )
+    parser.add_argument(
+        '--time_gap',
+        help='If the model uses the time_gap matrix',
         choices=[0, 1],
         default='0',
         type=int

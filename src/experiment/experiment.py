@@ -18,7 +18,7 @@ def print_dict(dictionary, max_iter_train):
 
 class RandomSearchExperiment:
     def __init__(self, model, dataset, iterations, results_path, accelerator='gpu',
-                 max_iter_train=5000, gpu='auto', bi=False):
+                 max_iter_train=5000, gpu='auto', bi=False, time_gap=False):
 
         self.results_path = f'{results_path}'
         self.selected_gpu = gpu
@@ -45,6 +45,7 @@ class RandomSearchExperiment:
         self.bi = bi
         self.model = model
         self.dataset = dataset
+        self.time_gap = time_gap
         self.iterations = iterations
         self.params_loader = RandomSearchLoader(model, iterations, bi=self.bi)
         self.accelerator = accelerator
@@ -53,7 +54,7 @@ class RandomSearchExperiment:
             self.params_loader.random_params['batch_size'][0][0])
 
     def prepare_data(self, batch_size):
-        dm = DataModule(dataset=self.dataset, batch_size=batch_size, use_time_gap_matrix=True)
+        dm = DataModule(dataset=self.dataset, batch_size=batch_size, use_time_gap_matrix=self.time_gap)
         edge_index, edge_weights = dm.get_connectivity()
         normalizer = dm.get_normalizer()
         dm.setup()
@@ -65,7 +66,7 @@ class RandomSearchExperiment:
         return dm, edge_index, edge_weights, normalizer
 
     def train_test(self, dm, edge_index, edge_weights, normalizer, hyperparameters):
-        hyperparameters['use_time_gap_matrix'] = True
+        hyperparameters['use_time_gap_matrix'] = self.time_gap
         hyperparameters['bi'] = self.bi
         model = GAIN(
             model_type=self.model,
