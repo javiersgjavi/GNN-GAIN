@@ -14,11 +14,13 @@ class BaseGNN(nn.Module):
 
     def bi_forward(self, input, edges, weights):
         b_input = torch.flip(input, dims=[1])
-        f_representation = self.model_f(input, edges, weights)
-        b_representation = self.model_b(b_input, edges, weights)
+        '''oroginal = (b, t, n, f)'''
+        f_representation = self.model_f(input, edges, weights).squeeze(dim=-1).permute(0, 2, 1)
+        b_representation = self.model_b(b_input, edges, weights).squeeze(dim=-1).permute(0, 2, 1)
 
         h = torch.cat([f_representation, b_representation], dim=-1)
-        return self.decoder_mlp(h)
+        output = self.decoder_mlp(h).permute(0, 2, 1)
+        return output
 
     def forward_g(self, x: torch.Tensor, input_mask: torch.Tensor, time_gap_matrix: torch.Tensor) -> Tuple[
         Tensor, Tensor]:
@@ -109,7 +111,7 @@ class GRUGCNBI(BaseGNN):
         ).apply(init_weights_xavier)
 
 
-class RNNEncGCNDecBI(BaseGNN):
+'''class RNNEncGCNDecBI(BaseGNN):
 
     def __init__(self, args, time_gap_matrix=False):
         super().__init__(edge_index=args['edge_index'], edge_weights=args['edge_weights'])
@@ -161,7 +163,64 @@ class RNNEncGCNDecBI(BaseGNN):
             input_size = output_size
 
         self.decoder_mlp.add_module(f'final_linear', nn.Linear(input_size, 1))
+        self.decoder_mlp.add_module(f'final_activation', nn.Sigmoid())'''
+
+
+class RNNEncGCNDecBI(BaseGNN):
+
+    def __init__(self, args, time_gap_matrix=False):
+        super().__init__(edge_index=args['edge_index'], edge_weights=args['edge_weights'])
+
+        self.time_gap_matrix = time_gap_matrix
+
+        self.model_f = RNNEncGCNDecModel(
+            exog_size=0,
+            input_size=2 if not self.time_gap_matrix else 3,
+            output_size=1,
+            hidden_size=int(args['periods'] * args['hidden_size']),
+            horizon=args['periods'],
+            rnn_layers=args['rnn_layers'],
+            gcn_layers=args['gcn_layers'],
+            rnn_dropout=args['rnn_dropout'],
+            gcn_dropout=args['gcn_dropout'],
+            activation=args['activation'],
+            cell_type=args['cell_type'],
+        ).apply(init_weights_xavier)
+
+        self.model_b = RNNEncGCNDecModel(
+            exog_size=0,
+            input_size=2 if not self.time_gap_matrix else 3,
+            output_size=1,
+            hidden_size=int(args['periods'] * args['hidden_size']),
+            horizon=args['periods'],
+            rnn_layers=args['rnn_layers'],
+            gcn_layers=args['gcn_layers'],
+            rnn_dropout=args['rnn_dropout'],
+            gcn_dropout=args['gcn_dropout'],
+            activation=args['activation'],
+            cell_type=args['cell_type'],
+        ).apply(init_weights_xavier)
+
+        self.decoder_mlp = nn.Sequential()
+        input_size = int(args['periods'] * 2)
+
+        for i, l in enumerate(range(args['mlp_layers'], 1, -1)):
+            output_size = int(((l - 1) * args['periods'] / args['mlp_layers']) + args['periods'])
+            output_size = output_size if output_size > 0 else 1
+            self.decoder_mlp.add_module(
+                f'linear_{i}',
+                nn.Linear(input_size, output_size)
+            )
+            self.decoder_mlp.add_module(
+                f'activation_{i}',
+                nn.ReLU()
+            )
+            input_size = output_size
+
+        self.decoder_mlp.add_module(f'final_linear', nn.Linear(input_size, args['periods']))
         self.decoder_mlp.add_module(f'final_activation', nn.Sigmoid())
+
+        print(self.decoder_mlp)
 
 
 class GatedGraphNetworkBI(BaseGNN):
