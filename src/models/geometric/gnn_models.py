@@ -31,7 +31,7 @@ class BaseGNN(nn.Module):
         x = input_mask * x + (1 - input_mask) * noise_matrix
 
         if self.time_gap_matrix:
-            input_tensor = torch.stack([x, input_mask, time_gap_matrix]).permute(1, 2, 3, 0)
+            input_tensor = torch.stack([x, input_mask, time_gap_matrix['forward']]).permute(1, 2, 3, 0)
         else:
             input_tensor = torch.stack([x, input_mask]).permute(1, 2, 3, 0)
 

@@ -9,7 +9,7 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from tsl.datasets import MetrLA, AirQuality, PemsBay
 from tsl.ops.imputation import add_missing_values
-from src.utils import create_windows_from_sequence, count_missing_sequences
+from src.utils import create_windows_from_sequence, count_missing_sequences, load_time_gap_matrix
 
 
 class ElectricDataset:
@@ -48,7 +48,8 @@ class DatasetLoader(Dataset):
                  known_values=None,
                  edge_index=None,
                  edge_weights=None,
-                 time_gap_matrix=None):
+                 time_gap_matrix_f=None,
+                 time_gap_matrix_b=None):
         """
         Initialize Dataset object
 
@@ -63,7 +64,8 @@ class DatasetLoader(Dataset):
         self.input_mask_int = mask.astype(int)
         self.edge_index = edge_index
         self.edge_weights = edge_weights
-        self.time_gap_matrix = time_gap_matrix
+        self.time_gap_matrix_f = time_gap_matrix_f
+        self.time_gap_matrix_b = time_gap_matrix_b
 
         self.data_missing = np.where(self.input_mask_bool, self.data, 0.0)
 
@@ -82,7 +84,7 @@ class DatasetLoader(Dataset):
         """
 
         return self.data_missing[idx], self.data[idx], self.input_mask_bool[idx], self.input_mask_int[idx], \
-            self.known_values[idx], self.time_gap_matrix[idx]
+            self.known_values[idx], {'forward': self.time_gap_matrix_f[idx], 'backward': self.time_gap_matrix_b[idx]}
 
     def get_missing_rate(self):
         print(f'Missing percentaje: {np.round(np.mean(self.input_mask_int == 0) * 100, 2)}')
@@ -130,14 +132,8 @@ class DataModule(pl.LightningModule):
                                            seed=9101112)
 
             if self.use_time_gap_matrix:
-                path_time_gap_matrix = f'./data/{dataset}/time_gap_matrix_{p_fault}_{p_noise}_{9101112}.npy'
-
-                if os.path.exists(path_time_gap_matrix):
-                    time_gap_matrix = np.load(path_time_gap_matrix)
-                else:
-
-                    time_gap_matrix = count_missing_sequences(base_data.training_mask.astype(int))
-                    np.save(path_time_gap_matrix, time_gap_matrix)
+                path_time_gap_matrix = f'./data/{dataset}/time_gap_matrix_{p_fault}_{p_noise}_{9101112}'
+                time_gap_matrix_f, time_gap_matrix_b = load_time_gap_matrix(base_data, path_time_gap_matrix)
 
 
         elif dataset.startswith('bay'):
@@ -149,13 +145,8 @@ class DataModule(pl.LightningModule):
                                            seed=56789)
 
             if self.use_time_gap_matrix:
-                path_time_gap_matrix = f'./data/{dataset}/time_gap_matrix_{p_fault}_{p_noise}_{56789}.npy'
-
-                if os.path.exists(path_time_gap_matrix):
-                    time_gap_matrix = np.load(path_time_gap_matrix)
-                else:
-                    time_gap_matrix = count_missing_sequences(base_data.training_mask.astype(int))
-                    np.save(path_time_gap_matrix, time_gap_matrix)
+                path_time_gap_matrix = f'./data/{dataset}/time_gap_matrix_{p_fault}_{p_noise}_{56789}'
+                time_gap_matrix_f, time_gap_matrix_b = load_time_gap_matrix(base_data, path_time_gap_matrix)
 
         elif dataset.startswith('air'):
             base_data = AirQuality(small='36' in dataset)
@@ -164,7 +155,8 @@ class DataModule(pl.LightningModule):
             base_data = ElectricDataset(prop_missing=prop_missing)
 
         if not self.use_time_gap_matrix:
-            time_gap_matrix = np.zeros_like(base_data.training_mask)
+            time_gap_matrix_f = np.zeros_like(base_data.training_mask)
+            time_gap_matrix_b = np.zeros_like(base_data.training_mask)
 
         self.data = base_data.dataframe()
         self.mask = base_data.training_mask
@@ -174,11 +166,13 @@ class DataModule(pl.LightningModule):
         self.normalizer = MinMaxScaler()
         self.data = pd.DataFrame(self.normalizer.fit_transform(self.data), columns=self.data.columns)
 
-        self.data, self.mask, self.known_values, self.time_gap_matrix = create_windows_from_sequence(
+        self.data, self.mask, self.known_values, self.time_gap_matrix_f, \
+            self.time_gap_matrix_b = create_windows_from_sequence(
             self.data,
             self.mask,
             self.known_values,
-            time_gap_matrix,
+            time_gap_matrix_f,
+            time_gap_matrix_b,
             window_len=24,
             stride=1
         )
@@ -205,42 +199,48 @@ class DataModule(pl.LightningModule):
         # Split the data into train, validation, and test sets using train_test_split
         data_train, data_test, train_mask, \
             test_mask, train_known_values, test_known_values, \
-            train_time_gap_matrix, test_time_gap_matrix = train_test_split(self.data_numpy,
-                                                                           self.mask,
-                                                                           self.known_values,
-                                                                           self.time_gap_matrix,
-                                                                           test_size=self.val_len + self.test_len)
+            train_time_gap_matrix_f, test_time_gap_matrix_f, \
+            train_time_gap_matrix_b, test_time_gap_matrix_b = train_test_split(self.data_numpy,
+                                                                               self.mask,
+                                                                               self.known_values,
+                                                                               self.time_gap_matrix_f,
+                                                                               self.time_gap_matrix_b,
+                                                                               test_size=self.val_len + self.test_len)
 
-        np.save('time.npy', train_time_gap_matrix)
         data_val, data_test, val_mask, \
             test_mask, val_known_values, test_known_values, \
-            val_time_gap_matrix, test_time_gap_matrix = train_test_split(data_test,
-                                                                         test_mask,
-                                                                         test_known_values,
-                                                                         test_time_gap_matrix,
-                                                                         test_size=self.val_len / (
-                                                                                 self.val_len + self.test_len))
+            val_time_gap_matrix_f, test_time_gap_matrix_f, \
+            val_time_gap_matrix_b, test_time_gap_matrix_b = train_test_split(data_test,
+                                                                             test_mask,
+                                                                             test_known_values,
+                                                                             test_time_gap_matrix_f,
+                                                                             test_time_gap_matrix_b,
+                                                                             test_size=self.val_len / (
+                                                                                     self.val_len + self.test_len))
 
         # Create Dataset objects for each set with missing values introduced according to prop_missing
         data_train = DatasetLoader(
             data_train,
             mask=train_mask,
             known_values=train_known_values,
-            time_gap_matrix=train_time_gap_matrix
+            time_gap_matrix_f=train_time_gap_matrix_f,
+            time_gap_matrix_b=train_time_gap_matrix_b
         )
 
         data_val = DatasetLoader(
             data_val,
             mask=val_mask,
             known_values=val_known_values,
-            time_gap_matrix=val_time_gap_matrix
+            time_gap_matrix_f=val_time_gap_matrix_f,
+            time_gap_matrix_b=val_time_gap_matrix_b
         )
 
         data_test = DatasetLoader(
             data_test,
             mask=test_mask,
             known_values=test_known_values,
-            time_gap_matrix=test_time_gap_matrix
+            time_gap_matrix_f=test_time_gap_matrix_f,
+            time_gap_matrix_b=test_time_gap_matrix_b
         )
 
         # Create DataLoader objects for each set

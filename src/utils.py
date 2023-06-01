@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import torch
 from torch import nn
@@ -22,7 +23,8 @@ def init_weights_xavier(m: nn.Module) -> None:
             m.bias.data.fill_(0.01)
 
 
-def create_windows_from_sequence(data, mask, known_values, time_gap_matrix, window_len=12, stride=1):
+def create_windows_from_sequence(data, mask, known_values, time_gap_matrix_f, time_gap_matrix_b, window_len=12,
+                                 stride=1):
     """
     Create windows from a sequence.
 
@@ -36,7 +38,8 @@ def create_windows_from_sequence(data, mask, known_values, time_gap_matrix, wind
     windows = []
     windows_mask = []
     windows_known_values = []
-    windows_time_gap_matrix = []
+    windows_time_gap_matrix_f = []
+    windows_time_gap_matrix_b = []
 
     if len(mask.shape) == 3:
         mask = mask[:, :, 0]
@@ -46,9 +49,17 @@ def create_windows_from_sequence(data, mask, known_values, time_gap_matrix, wind
         windows.append(data[i:i + window_len])
         windows_mask.append(mask[i:i + window_len])
         windows_known_values.append(known_values[i:i + window_len])
-        windows_time_gap_matrix.append(time_gap_matrix[i:i + window_len])
+        windows_time_gap_matrix_f.append(time_gap_matrix_f[i:i + window_len])
+        windows_time_gap_matrix_b.append(time_gap_matrix_b[i:i + window_len])
 
-    return np.array(windows), np.array(windows_mask), np.array(windows_known_values), np.array(windows_time_gap_matrix)
+    res = (
+        np.array(windows),
+        np.array(windows_mask),
+        np.array(windows_known_values),
+        np.array(windows_time_gap_matrix_f),
+        np.array(windows_time_gap_matrix_b)
+    )
+    return res
 
 
 def generate_uniform_noise(tensor_like, low=0, high=0.01):
@@ -72,7 +83,7 @@ def mean_relative_error(x: np.array, y: np.array) -> np.array:
 def count_missing_sequences(matriz, max_time_gap=24):
     rows, nodes = matriz.shape[:2]
     res = np.zeros_like(matriz).astype(np.float32)
-    norm_values = {i: i/max_time_gap for i in range(max_time_gap+1)}
+    norm_values = {i: i / max_time_gap for i in range(max_time_gap + 1)}
     for n in tqdm(range(nodes), desc='Counting missing sequences'):
         current_sequence = 0
         for r in range(rows):
@@ -84,6 +95,27 @@ def count_missing_sequences(matriz, max_time_gap=24):
                 current_sequence = 0
 
     return res[:, :, 0]
+
+
+def load_time_gap_matrix(base_data, path):
+    data_f = base_data.training_mask.astype(int)
+    data_b = data_f[::-1, :, :]
+
+    # Load forward time gap matrix
+    if os.path.exists(f'{path}_f.npy'):
+        time_gap_matrix_f = np.load(f'{path}_f.npy')
+    else:
+        time_gap_matrix_f = count_missing_sequences(data_f)
+        np.save(f'{path}_f.npy', time_gap_matrix_f)
+
+    # Load backward time gap matrix
+    if os.path.exists(f'{path}_b.npy'):
+        time_gap_matrix_b = np.load(f'{path}_b.npy')
+    else:
+        time_gap_matrix_b = count_missing_sequences(data_b)
+        np.save(f'{path}_b.npy', time_gap_matrix_b)
+
+    return time_gap_matrix_f, time_gap_matrix_b[::-1, :]  # no se si tendría que hacer este segundo revers
 
 
 def loss_d(d_prob: torch.Tensor, m: torch.Tensor) -> torch.Tensor:

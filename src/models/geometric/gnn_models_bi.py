@@ -12,15 +12,26 @@ class BaseGNN(nn.Module):
         self.edge_weights = edge_weights
         self.model = None
 
-    def bi_forward(self, input, edges, weights):
-        b_input = torch.flip(input, dims=[1])
-        '''oroginal = (b, t, n, f)'''
-        f_representation = self.model_f(input, edges, weights).squeeze(dim=-1).permute(0, 2, 1)
-        b_representation = self.model_b(b_input, edges, weights).squeeze(dim=-1).permute(0, 2, 1)
+    def bi_forward(self, input_tensor_f, input_tensor_b, edges, weights):
+        f_representation = self.model_f(input_tensor_f, edges, weights).squeeze(dim=-1).permute(0, 2, 1)
+        b_representation = self.model_b(input_tensor_b, edges, weights).squeeze(dim=-1).permute(0, 2, 1)
 
         h = torch.cat([f_representation, b_representation], dim=-1)
         output = self.decoder_mlp(h).permute(0, 2, 1)
         return output
+
+    def prepare_inputs(self, x, input_mask, time_gap_matrix):
+        tensors_to_stack_f = [x, input_mask] if not self.time_gap_matrix else [x, input_mask,
+                                                                               time_gap_matrix['forward']]
+        input_tensor_f = torch.stack(tensors_to_stack_f).permute(1, 2, 3, 0)
+
+        tensors_to_stack_b = [x, input_mask] if not self.time_gap_matrix else [x, input_mask,
+                                                                               time_gap_matrix['backward']]
+        for i, tensor in enumerate(tensors_to_stack_b):
+            tensors_to_stack_b[i] = torch.flip(tensor, dims=[1])
+        input_tensor_b = torch.stack(tensors_to_stack_b).permute(1, 2, 3, 0)
+
+        return input_tensor_f, input_tensor_b
 
     def forward_g(self, x: torch.Tensor, input_mask: torch.Tensor, time_gap_matrix: torch.Tensor) -> Tuple[
         Tensor, Tensor]:
@@ -41,12 +52,8 @@ class BaseGNN(nn.Module):
         # Concatenate the input tensor with the noise matrix
         x = input_mask * x + (1 - input_mask) * noise_matrix
 
-        if self.time_gap_matrix:
-            input_tensor = torch.stack([x, input_mask, time_gap_matrix]).permute(1, 2, 3, 0)
-        else:
-            input_tensor = torch.stack([x, input_mask]).permute(1, 2, 3, 0)
-
-        imputation = self.bi_forward(input_tensor, self.edge_index, self.edge_weights).squeeze(dim=-1)
+        input_tensor_f, input_tensor_b = self.prepare_inputs(x, input_mask, time_gap_matrix)
+        imputation = self.bi_forward(input_tensor_f, input_tensor_b, self.edge_index, self.edge_weights).squeeze(dim=-1)
 
         # Concatenate the original data with the imputed data
         res = input_mask * x + (1 - input_mask) * imputation
@@ -65,8 +72,9 @@ class BaseGNN(nn.Module):
             torch.Tensor: The output tensor of the discriminator network.
 
         """
-        input_tensor = torch.stack([x, hint_matrix]).permute(1, 2, 3, 0)
-        pred = self.bi_forward(input_tensor, self.edge_index, self.edge_weights).squeeze(dim=-1)
+        input_tensor_f = torch.stack([x, hint_matrix]).permute(1, 2, 3, 0)
+        input_tensor_b = torch.stack([torch.flip(x, dims=[1]), torch.flip(hint_matrix, dims=[1])]).permute(1, 2, 3, 0)
+        pred = self.bi_forward(input_tensor_f, input_tensor_b, self.edge_index, self.edge_weights).squeeze(dim=-1)
         return torch.sigmoid(pred)
 
 

@@ -200,7 +200,7 @@ class GAIN(pl.LightningModule):
         x, x_real, input_mask_bool, input_mask_int, known_values, time_gap_matrix = batch
 
         # Forward Generator
-        x_fake, imputation = self.generator.forward_g(x=x, input_mask=input_mask_int, time_gap_matrix=time_gap_matrix)
+        x_fake, imputation = self.generator.forward_g(x=x, input_mask=input_mask_int, time_gap_matrix=time_gap_matrix) # tengo que recibir las dos
 
         # Generate Hint Matrix
         hint_matrix = self.hint_generator.generate(input_mask_int)
