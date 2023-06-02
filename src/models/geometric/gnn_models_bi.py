@@ -12,6 +12,28 @@ class BaseGNN(nn.Module):
         self.edge_weights = edge_weights
         self.model = None
 
+    def define_mlp_encoder(self, mlp_layers, periods):
+        self.decoder_mlp = nn.Sequential()
+        input_size = int(periods * 2)
+
+        for i, l in enumerate(range(mlp_layers, 1, -1)):
+            output_size = int(((l - 1) * periods / mlp_layers) + periods)
+            output_size = output_size if output_size > 0 else 1
+            self.decoder_mlp.add_module(
+                f'linear_{i}',
+                nn.Linear(input_size, output_size)
+            )
+            self.decoder_mlp.add_module(
+                f'activation_{i}',
+                nn.ReLU()
+            )
+            input_size = output_size
+
+        self.decoder_mlp.add_module(f'final_linear', nn.Linear(input_size, periods))
+        self.decoder_mlp.add_module(f'final_activation', nn.Sigmoid())
+
+        self.decoder_mlp.apply(init_weights_xavier)
+
     def bi_forward(self, input_tensor_f, input_tensor_b, edges, weights):
         f_representation = self.model_f(input_tensor_f, edges, weights).squeeze(dim=-1).permute(0, 2, 1)
         b_representation = self.model_b(input_tensor_b, edges, weights).squeeze(dim=-1).permute(0, 2, 1)
@@ -106,7 +128,7 @@ class GRUGCNBI(BaseGNN):
 
         self.time_gap_matrix = time_gap_matrix
 
-        self.model = GRUGCNModel(
+        self.model_f = GRUGCNModel(
             exog_size=0,
             input_size=2 if not self.time_gap_matrix else 3,
             output_size=1,
@@ -118,60 +140,21 @@ class GRUGCNBI(BaseGNN):
             norm=args['norm'],
         ).apply(init_weights_xavier)
 
-
-'''class RNNEncGCNDecBI(BaseGNN):
-
-    def __init__(self, args, time_gap_matrix=False):
-        super().__init__(edge_index=args['edge_index'], edge_weights=args['edge_weights'])
-
-        self.time_gap_matrix = time_gap_matrix
-
-        self.model_f = RNNEncGCNDecModel(
+        self.model_b = GRUGCNModel(
             exog_size=0,
             input_size=2 if not self.time_gap_matrix else 3,
-            output_size=args['mlp_h'],
+            output_size=1,
             hidden_size=int(args['periods'] * args['hidden_size']),
             horizon=args['periods'],
-            rnn_layers=args['rnn_layers'],
-            gcn_layers=args['gcn_layers'],
-            rnn_dropout=args['rnn_dropout'],
-            gcn_dropout=args['gcn_dropout'],
             activation=args['activation'],
-            cell_type=args['cell_type'],
+            enc_layers=args['enc_layers'],
+            gcn_layers=args['gcn_layers'],
+            norm=args['norm'],
         ).apply(init_weights_xavier)
 
-        self.model_b = RNNEncGCNDecModel(
-            exog_size=0,
-            input_size=2 if not self.time_gap_matrix else 3,
-            output_size=args['mlp_h'],
-            hidden_size=int(args['periods'] * args['hidden_size']),
-            horizon=args['periods'],
-            rnn_layers=args['rnn_layers'],
-            gcn_layers=args['gcn_layers'],
-            rnn_dropout=args['rnn_dropout'],
-            gcn_dropout=args['gcn_dropout'],
-            activation=args['activation'],
-            cell_type=args['cell_type'],
-        ).apply(init_weights_xavier)
+        self.define_mlp_encoder(args['mlp_layers'], args['periods'])
 
-        self.decoder_mlp = nn.Sequential()
-        input_size = int(args['mlp_h']*2)
-
-        for i, l in enumerate(range(args['mlp_layers'], 1, -1)):
-            output_size = int((l - 1) * args['mlp_h']*2 / args['mlp_layers'])
-            output_size = output_size if output_size > 0 else 1
-            self.decoder_mlp.add_module(
-                f'linear_{i}',
-                nn.Linear(input_size, output_size)
-            )
-            self.decoder_mlp.add_module(
-                f'activation_{i}',
-                nn.ReLU()
-            )
-            input_size = output_size
-
-        self.decoder_mlp.add_module(f'final_linear', nn.Linear(input_size, 1))
-        self.decoder_mlp.add_module(f'final_activation', nn.Sigmoid())'''
+        print(self.decoder_mlp)
 
 
 class RNNEncGCNDecBI(BaseGNN):
@@ -209,24 +192,7 @@ class RNNEncGCNDecBI(BaseGNN):
             cell_type=args['cell_type'],
         ).apply(init_weights_xavier)
 
-        self.decoder_mlp = nn.Sequential()
-        input_size = int(args['periods'] * 2)
-
-        for i, l in enumerate(range(args['mlp_layers'], 1, -1)):
-            output_size = int(((l - 1) * args['periods'] / args['mlp_layers']) + args['periods'])
-            output_size = output_size if output_size > 0 else 1
-            self.decoder_mlp.add_module(
-                f'linear_{i}',
-                nn.Linear(input_size, output_size)
-            )
-            self.decoder_mlp.add_module(
-                f'activation_{i}',
-                nn.ReLU()
-            )
-            input_size = output_size
-
-        self.decoder_mlp.add_module(f'final_linear', nn.Linear(input_size, args['periods']))
-        self.decoder_mlp.add_module(f'final_activation', nn.Sigmoid())
+        self.define_mlp_encoder(args['mlp_layers'], args['periods'])
 
         print(self.decoder_mlp)
 

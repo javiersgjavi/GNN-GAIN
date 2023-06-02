@@ -27,6 +27,9 @@ class RandomSearchLoader:
             'hidden_size': uniform(*self.params_grid['hidden_size'], size=n_iter),
         }
 
+        if self.bi:
+            params_dict['mlp_layers'] = randint_close_interval(*self.params_grid['mlp_layers'], size=n_iter)
+
         params_grid_model = self.params_grid[self.model_name]
 
         if self.model_name == 'ggn':
@@ -43,10 +46,6 @@ class RandomSearchLoader:
             params_dict['gcn_dropout'] = uniform(*params_grid_model['gcn_dropout'], size=n_iter)
 
             params_dict['cell_type'] = choice(params_grid_model['cell_type'], size=n_iter)
-
-            if self.bi:
-                params_dict['mlp_h'] = randint_close_interval(*params_grid_model['mlp_h'], size=n_iter)
-                params_dict['mlp_layers'] = randint_close_interval(*params_grid_model['mlp_layers'], size=n_iter)
 
         elif self.model_name == 'stcn':
 
