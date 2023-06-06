@@ -1,7 +1,7 @@
 import itertools
 import pandas as pd
 import argparse
-from src.experiment.experiment import RandomSearchExperiment
+from src.experiment.experiment import BlockPointMissingExperiment
 
 
 def make_summary_dataset(datasets, models):
@@ -88,7 +88,7 @@ def main(args):
 
     for dataset, model in itertools.product(datasets, models):
         results_path = f'./results/{dataset}/'
-        random_search = RandomSearchExperiment(
+        random_search = BlockPointMissingExperiment(
             model=model,
             dataset=dataset,
             iterations=iterations,
@@ -110,17 +110,17 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--datasets',
-        default='la,air,air-36,bay',
+        default='la,bay',
         type=str)
     parser.add_argument(
         '--models',
         help='models to optimize',
-        default='grugcn,rnngcn,stcn,ggn,dcrnn',
+        default='grugcn,rnngcn',
         type=str)
     parser.add_argument(
         '--iterations',
         help='number of iterations for the random search',
-        default=300,
+        default=100,
         type=int)
     parser.add_argument(
         '--imputation_problem',
