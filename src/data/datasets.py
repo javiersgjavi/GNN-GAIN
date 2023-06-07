@@ -9,7 +9,8 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from tsl.datasets import MetrLA, AirQuality, PemsBay
 from tsl.ops.imputation import add_missing_values
-from src.utils import create_windows_from_sequence, count_missing_sequences, load_time_gap_matrix
+from src.utils import load_time_gap_matrix
+from src.data.splitters import RatioSplitter, AQICustomInSampleSplitter, AQICustomOutSampleSplitter
 
 
 class ElectricDataset:
@@ -150,6 +151,9 @@ class DataModule(pl.LightningModule):
 
         elif dataset.startswith('air'):
             base_data = AirQuality(small='36' in dataset)
+            if self.use_time_gap_matrix:
+                path_time_gap_matrix = f'./data/{dataset}/time_gap_matrix'
+                time_gap_matrix_f, time_gap_matrix_b = load_time_gap_matrix(base_data, path_time_gap_matrix)
 
         elif dataset.startswith('electric'):
             base_data = ElectricDataset(prop_missing=prop_missing)
@@ -158,32 +162,24 @@ class DataModule(pl.LightningModule):
             time_gap_matrix_f = np.zeros_like(base_data.training_mask)
             time_gap_matrix_b = np.zeros_like(base_data.training_mask)
 
+        self.dataset_name = dataset
+        self.base_data = base_data
         self.data = base_data.dataframe()
         self.mask = base_data.training_mask
         self.known_values = base_data.eval_mask
         self.edge_index, self.edge_weights = base_data.get_connectivity()
+        self.time_gap_matrix_f = time_gap_matrix_f
+        self.time_gap_matrix_b = time_gap_matrix_b
 
         self.normalizer = MinMaxScaler()
         self.data = pd.DataFrame(self.normalizer.fit_transform(self.data), columns=self.data.columns)
-
-        self.data, self.mask, self.known_values, self.time_gap_matrix_f, \
-            self.time_gap_matrix_b = create_windows_from_sequence(
-            self.data,
-            self.mask,
-            self.known_values,
-            time_gap_matrix_f,
-            time_gap_matrix_b,
-            window_len=24,
-            stride=1
-        )
-
-        # Convert the data to a numpy array
-        self.data_numpy = self.data.astype(np.float32)
+        self.splitter = None
 
         self.prop_missing = prop_missing
         self.batch_size = batch_size
         self.val_len = val_len
         self.test_len = test_len
+        self.shape = None
         self.train_loader = None
         self.val_loader = None
         self.test_loader = None
@@ -197,50 +193,65 @@ class DataModule(pl.LightningModule):
         """
 
         # Split the data into train, validation, and test sets using train_test_split
-        data_train, data_test, train_mask, \
-            test_mask, train_known_values, test_known_values, \
-            train_time_gap_matrix_f, test_time_gap_matrix_f, \
-            train_time_gap_matrix_b, test_time_gap_matrix_b = train_test_split(self.data_numpy,
-                                                                               self.mask,
-                                                                               self.known_values,
-                                                                               self.time_gap_matrix_f,
-                                                                               self.time_gap_matrix_b,
-                                                                               test_size=self.val_len + self.test_len)
+        if self.dataset_name.startswith('air'):
+            if self.dataset_name.endswith('_in'):
 
-        data_val, data_test, val_mask, \
-            test_mask, val_known_values, test_known_values, \
-            val_time_gap_matrix_f, test_time_gap_matrix_f, \
-            val_time_gap_matrix_b, test_time_gap_matrix_b = train_test_split(data_test,
-                                                                             test_mask,
-                                                                             test_known_values,
-                                                                             test_time_gap_matrix_f,
-                                                                             test_time_gap_matrix_b,
-                                                                             test_size=self.val_len / (
-                                                                                     self.val_len + self.test_len))
+                self.splitter = AQICustomInSampleSplitter(
+                    data=self.data,
+                    mask=self.mask,
+                    known_values=self.known_values,
+                    time_gap_matrix_f=self.time_gap_matrix_f,
+                    time_gap_matrix_b=self.time_gap_matrix_b,
+                    windows_len=36 if self.dataset_name.startswith('air-36') else 24,
+                    base_data=self.base_data,
+                    name_time_col='datetime' if self.dataset_name.startswith('air-36') else 'time',
+                )
+            else:
+                self.splitter = AQICustomOutSampleSplitter(
+                    data=self.data,
+                    mask=self.mask,
+                    known_values=self.known_values,
+                    time_gap_matrix_f=self.time_gap_matrix_f,
+                    time_gap_matrix_b=self.time_gap_matrix_b,
+                    windows_len=36 if self.dataset_name.startswith('air-36') else 24,
+                    base_data=self.base_data,
+                    name_time_col='datetime' if self.dataset_name.startswith('air-36') else 'time',
+                )
+        else:
+            self.splitter = RatioSplitter(
+                data=self.data,
+                mask=self.mask,
+                known_values=self.known_values,
+                time_gap_matrix_f=self.time_gap_matrix_f,
+                time_gap_matrix_b=self.time_gap_matrix_b,
+            )
+
+        train, val, test, shape = self.splitter.split()
+        self.shape = shape
 
         # Create Dataset objects for each set with missing values introduced according to prop_missing
         data_train = DatasetLoader(
-            data_train,
-            mask=train_mask,
-            known_values=train_known_values,
-            time_gap_matrix_f=train_time_gap_matrix_f,
-            time_gap_matrix_b=train_time_gap_matrix_b
+            train['data'],
+            mask=train['mask'],
+            known_values=train['known_values'],
+            time_gap_matrix_f=train['tgm_f'],
+            time_gap_matrix_b=train['tgm_b']
         )
 
         data_val = DatasetLoader(
-            data_val,
-            mask=val_mask,
-            known_values=val_known_values,
-            time_gap_matrix_f=val_time_gap_matrix_f,
-            time_gap_matrix_b=val_time_gap_matrix_b
+            val['data'],
+            mask=val['mask'],
+            known_values=val['known_values'],
+            time_gap_matrix_f=val['tgm_f'],
+            time_gap_matrix_b=val['tgm_b']
         )
 
         data_test = DatasetLoader(
-            data_test,
-            mask=test_mask,
-            known_values=test_known_values,
-            time_gap_matrix_f=test_time_gap_matrix_f,
-            time_gap_matrix_b=test_time_gap_matrix_b
+            test['data'],
+            mask=test['mask'],
+            known_values=test['known_values'],
+            time_gap_matrix_f=test['tgm_f'],
+            time_gap_matrix_b=test['tgm_b']
         )
 
         # Create DataLoader objects for each set
@@ -251,7 +262,7 @@ class DataModule(pl.LightningModule):
         data_train.get_missing_rate()
 
     def input_size(self):
-        return self.data.shape[1:]
+        return self.shape[1:]
 
     def train_dataloader(self):
         return self.train_loader

@@ -115,7 +115,7 @@ def load_time_gap_matrix(base_data, path):
         time_gap_matrix_b = count_missing_sequences(data_b)
         np.save(f'{path}_b.npy', time_gap_matrix_b)
 
-    return time_gap_matrix_f, time_gap_matrix_b[::-1, :]  # no se si tendría que hacer este segundo revers
+    return time_gap_matrix_f, time_gap_matrix_b[::-1, :]
 
 
 def loss_d(d_prob: torch.Tensor, m: torch.Tensor) -> torch.Tensor:

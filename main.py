@@ -13,7 +13,7 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 def main(args):
     # Parse arguments
     dataset = args.dataset
-    model = args.model
+    model = args.model_name
     miss_rate = args.miss_rate
     iterations = args.iterations
     imputation_problem = args.imputation_problem

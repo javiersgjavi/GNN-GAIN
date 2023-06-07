@@ -1,6 +1,7 @@
 import os
 import json
 import torch
+import itertools
 import pandas as pd
 from tqdm import tqdm
 from src.experiment.params_optimizer import RandomSearchLoader
@@ -18,11 +19,21 @@ def print_dict(dictionary, max_iter_train):
 
 class RandomSearchExperiment:
     def __init__(self, model, dataset, iterations, results_path, accelerator='gpu',
-                 max_iter_train=5000, gpu='auto', bi=False, time_gap=False, columns=None):
+                 max_iter_train=5000, gpu='auto', bi=False, time_gap=False):
+
+        self.columns = [
+            'mse',
+            'mae',
+            'rmse',
+            'denorm_mse',
+            'denorm_mae',
+            'denorm_rmse',
+            'denorm_mre',
+            'params'
+        ]
 
         self.bi = bi
-        self.model = model
-        self.columns = columns
+        self.model_name = model
         self.dataset = dataset
         self.selected_gpu = gpu
         self.time_gap = time_gap
@@ -35,15 +46,13 @@ class RandomSearchExperiment:
 
         self.results_path = f'{results_path}'
         self.results_file = self.load_file()
-        self.trainer = None
-        self.dm = None
 
     def load_file(self):
 
-        os.makedirs(results_path, exist_ok=True)
+        os.makedirs(self.results_path, exist_ok=True)
 
-        if os.path.exists(f'{results_path}/{model}_results.csv'):
-            results_file = pd.read_csv(f'{results_path}/{model}_results.csv', index_col='Unnamed: 0')
+        if os.path.exists(f'{self.results_path}/{self.model_name}_results.csv'):
+            results_file = pd.read_csv(f'{self.results_path}/{self.model_name}_results.csv', index_col='Unnamed: 0')
 
         else:
             results_file = pd.DataFrame(columns=self.columns)
@@ -62,12 +71,12 @@ class RandomSearchExperiment:
 
         return dm, edge_index, edge_weights, normalizer
 
-    def train(self, hyperparameters):
+    def train_test(self, hyperparameters):
         hyperparameters['use_time_gap_matrix'] = self.time_gap
         hyperparameters['bi'] = self.bi
         model = GAIN(
-            model_type=self.model,
-            input_size=dm.input_size(),
+            model_type=self.model_name,
+            input_size=self.dm.input_size(),
             edge_index=self.edge_index,
             edge_weights=self.edge_weights,
             normalizer=self.normalizer,
@@ -84,45 +93,10 @@ class RandomSearchExperiment:
 
         trainer.fit(model, datamodule=self.dm)
 
-        self.trainer = trainer
+        results = trainer.test(model, datamodule=self.dm)[0]
+        return results
 
-    def save_results_file(self, row):
-
-        self.results_file.loc[self.results_file.shape[0]] = row
-        self.results_file.to_csv(f'{self.results_path}/{self.model}_results.csv')
-
-    def run(self):
-        for i in tqdm(range(self.results_file.shape[0], self.iterations),
-                      desc=f'Random Search with {self.model} in {self.dataset}'):
-            hyperparameters = self.params_loader.get_params(i)
-            print_dict(hyperparameters, self.max_iter_train)
-            self.train(hyperparameters)
-            results = self.test()
-            self.save_results(results, hyperparameters)
-
-
-#######################################################################################################################
-#######################################################################################################################
-#######################################################################################################################
-
-class BlockPointMissingExperiment(RandomSearchExperiment):
-    def __init__(self, *args, **kwargs):
-        columns = [
-            'mae',
-            'mse',
-            'rmse',
-            'denorm_mae',
-            'denorm_mse',
-            'denorm_mre',
-            'denorm_rmse',
-            'params'
-        ]
-        super().__init__(columns=columns, *args, **kwargs)
-
-    def test(self):
-        return self.trainer.test(model, datamodule=self.dm)[0]
-
-    def save_results(self, results, params):
+    def save_results_file(self, results, params):
         row = [
             results['mae'],
             results['mse'],
@@ -134,55 +108,117 @@ class BlockPointMissingExperiment(RandomSearchExperiment):
             params,
         ]
 
-        super().save_results_file(row)
+        self.results_file.loc[self.results_file.shape[0]] = row
+        self.results_file.to_csv(f'{self.results_path}/{self.model_name}_results.csv')
+
+    def run(self):
+        for i in tqdm(range(self.results_file.shape[0], self.iterations),
+                      desc=f'Random Search with {self.model_name} in {self.dataset}'):
+            hyperparameters = self.params_loader.get_params(i)
+            print_dict(hyperparameters, self.max_iter_train)
+            results = self.train_test(hyperparameters)
+            self.save_results_file(results, hyperparameters)
 
 
-class InOutSampleExperiment(RandomSearchExperiment):
-    def __init__(self, *args, **kwargs):
+class RandomSearch:
+
+    def __init__(self, models=None, datasets=None, iterations=100, gpu='auto', max_iter_train=5000, bi=None,
+                 time_gap=None, folder='results'):
+
+        self.models = models
+        self.datasets = datasets
+        self.iterations = iterations
+
+        self.folder = folder
+        self.gpu = gpu
+        self.max_iter_train = max_iter_train
+        self.bi = bi
+        self.time_gap = time_gap
+
+    def make_summary_dataset(self, datasets, models):
         columns = [
-            'mae_in',
-            'mse_in',
-            'rmse_in',
-            'denorm_mae_in',
-            'denorm_mse_in',
-            'denorm_mre_in',
-            'denorm_rmse_in',
-            'mae_out',
-            'mse_out',
-            'rmse_out',
-            'denorm_mae_out',
-            'denorm_mse_out',
-            'denorm_mre_out',
-            'denorm_rmse_out',
+            'model',
+            'mse',
+            'mae',
+            'rmse',
+            'denorm_mse',
+            'denorm_mae',
+            'denorm_rmse',
+            'denorm_mre',
             'params'
         ]
-        super().__init__(columns=columns, *args, **kwargs)
 
-    def test(self):
-        out_sample = self.trainer.test(model, datamodule=self.dm)[0]
-        in_sample = self.trainer.test(model, dataloaders=self.dm.train_dataloader())[0]
-        results = {'in': in_sample, 'out': out_sample}
-        return results
+        for dataset in datasets:
+            results_path = f'./{self.folder}/{dataset}/'
+            result_file = pd.DataFrame(columns=columns)
+            for model in models:
+                results_model = pd.read_csv(f'{results_path}{model}_results.csv')
+                best_result = results_model.iloc[results_model['mae'].idxmin()]
+                row = [
+                    model,
+                    best_result['mse'],
+                    best_result['mae'],
+                    best_result['rmse'],
+                    best_result['denorm_mse'],
+                    best_result['denorm_mae'],
+                    best_result['denorm_rmse'],
+                    best_result['denorm_mre'],
+                    best_result['params']
+                ]
+                result_file.loc[len(result_file)] = row
 
-    def save_results(self, results, params):
-        row = [
-            results['in']['mae'],
-            results['in']['mse'],
-            results['in']['rmse'],
-            results['in']['denorm_mae'],
-            results['in']['denorm_mse'],
-            results['in']['denorm_mre'],
-            results['in']['denorm_rmse'],
+            result_file.to_csv(f'{results_path}/results.csv', index=False)
 
-            results['out']['mae'],
-            results['out']['mse'],
-            results['out']['rmse'],
-            results['out']['denorm_mae'],
-            results['out']['denorm_mse'],
-            results['out']['denorm_mre'],
-            results['out']['denorm_rmse'],
-
-            params,
+    def make_summary_general(self, datasets):
+        columns = [
+            'dataset',
+            'model',
+            'mae',
+            'mse',
+            'rmse',
+            'denorm_mae',
+            'denorm_mse',
+            'denorm_mre',
+            'denorm_rmse',
+            'params'
         ]
+        result_file = pd.DataFrame(columns=columns)
 
-        super().save_results_file(row)
+        for dataset in datasets:
+            results_dataset_path = f'./{self.folder}/{dataset}/results.csv'
+            results_dataset = pd.read_csv(results_dataset_path)
+
+            best_result = results_dataset.iloc[results_dataset['mae'].idxmin()]
+            row = [
+                dataset,
+                best_result['model'],
+                best_result['mae'],
+                best_result['mse'],
+                best_result['rmse'],
+                best_result['denorm_mae'],
+                best_result['denorm_mse'],
+                best_result['denorm_mre'],
+                best_result['denorm_rmse'],
+                best_result['params']
+            ]
+            result_file.loc[len(result_file)] = row
+
+        result_file.to_csv(f'./results/results.csv', index=False)
+
+    def run(self):
+        for dataset, model in itertools.product(self.datasets, self.models):
+            results_path = f'./{self.folder}/{dataset}/'
+            random_search = RandomSearchExperiment(
+                model=model,
+                dataset=dataset,
+                iterations=self.iterations,
+                results_path=results_path,
+                gpu=self.gpu,
+                max_iter_train=self.max_iter_train,
+                bi=self.bi,
+                time_gap=self.time_gap
+            )
+
+            random_search.run()
+        self.make_summary_dataset(self.datasets, self.models)
+        self.make_summary_general(self.datasets)
