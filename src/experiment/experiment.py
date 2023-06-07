@@ -203,7 +203,7 @@ class RandomSearch:
             ]
             result_file.loc[len(result_file)] = row
 
-        result_file.to_csv(f'./results/results.csv', index=False)
+        result_file.to_csv(f'./{self.folder}/results.csv', index=False)
 
     def run(self):
         for dataset, model in itertools.product(self.datasets, self.models):
