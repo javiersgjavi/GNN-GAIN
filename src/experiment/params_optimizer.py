@@ -12,7 +12,7 @@ class RandomSearchLoader:
         self.model_name = model_name
         self.bi = bi
 
-        file = 'params_random_search.json' if not self.bi else 'params_random_search_bi.json'
+        file = 'params_random_search.json'
 
         with open(f'src/experiment/{file}') as f:
             self.params_grid = json.load(f)
