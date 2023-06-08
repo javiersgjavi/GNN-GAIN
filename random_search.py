@@ -51,7 +51,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--datasets',
-        help='datasets to optimize separated by commas, e.g. la,bay,air,air-36',
+        help='datasets to optimize separated by commas, e.g. la,bay,air,air-36,electric{missing_prop}',
         default='la,bay',
         type=str)
     parser.add_argument(
