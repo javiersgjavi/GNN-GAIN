@@ -32,5 +32,11 @@
         "enc_layers": 2,
         "gcn_layers": 1
 
+    },
+    "dcrnn":{
+        "kernel_size": 2,
+        "n_layers": 1,
+        "dropout": 0
+
     }
 }

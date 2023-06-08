@@ -5,7 +5,8 @@ from typing import Dict, Tuple
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from torchmetrics import MeanAbsoluteError
 
-from src.models.geometric.gnn_models import STCN, GRUGCN, RNNEncGCNDec, GatedGraphNetwork
+from src.models.geometric.gnn_models import STCN, GRUGCN, RNNEncGCNDec, GatedGraphNetwork, DCRNN
+from src.models.geometric.gnn_models_bi import STCNBI, GRUGCNBI, RNNEncGCNDecBI, GatedGraphNetworkBI, DCRNNBI
 
 from src.models.mlp import MLP
 
@@ -67,8 +68,19 @@ class GAIN(pl.LightningModule):
             'grugcn': GRUGCN,
             'rnngcn': RNNEncGCNDec,
             'ggn': GatedGraphNetwork,
+            'dcrnn': DCRNN,
             'mlp': MLP
         }
+
+        model_class_bi = {
+            'stcn': STCNBI,
+            'grugcn': GRUGCNBI,
+            'rnngcn': RNNEncGCNDecBI,
+            'ggn': GatedGraphNetworkBI,
+            'dcrnn': DCRNNBI,
+        }
+
+        model = model_class_bi[model_type] if params['bi'] else model_class[model_type]
 
         self.alpha = alpha
         self.nodes = input_size[1]
@@ -86,8 +98,10 @@ class GAIN(pl.LightningModule):
         self.args = {**args, **params}
 
         # Three main components of the GAIN model
-        self.generator = model_class[model_type](self.args)
-        self.discriminator = model_class[model_type](self.args)
+
+        self.use_time_gap = params['use_time_gap_matrix']
+        self.generator = model(self.args, time_gap_matrix=self.use_time_gap)
+        self.discriminator = model(self.args)
 
         self.hint_generator = HintGenerator(prop_hint=hint_rate)
 
@@ -183,10 +197,10 @@ class GAIN(pl.LightningModule):
             A dictionary containing the output tensors of the generator and discriminator for the batch, as well as the
             real input and the input mask.
         """
-        x, x_real, input_mask_bool, input_mask_int, known_values = batch
+        x, x_real, input_mask_bool, input_mask_int, known_values, time_gap_matrix = batch
 
         # Forward Generator
-        x_fake, imputation = self.generator.forward_g(x=x, input_mask=input_mask_int)
+        x_fake, imputation = self.generator.forward_g(x=x, input_mask=input_mask_int, time_gap_matrix=time_gap_matrix) # tengo que recibir las dos
 
         # Generate Hint Matrix
         hint_matrix = self.hint_generator.generate(input_mask_int)
