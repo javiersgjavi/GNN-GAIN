@@ -22,13 +22,13 @@ class RandomSearchExperiment:
                  max_iter_train=5000, gpu='auto', bi=False, time_gap=False):
 
         self.columns = [
-            'mse',
             'mae',
+            'mse',
             'rmse',
-            'denorm_mse',
             'denorm_mae',
-            'denorm_rmse',
+            'denorm_mse',
             'denorm_mre',
+            'denorm_rmse',
             'params'
         ]
 
@@ -138,13 +138,13 @@ class RandomSearch:
     def make_summary_dataset(self, datasets, models):
         columns = [
             'model',
-            'mse',
             'mae',
+            'mse',
             'rmse',
-            'denorm_mse',
             'denorm_mae',
-            'denorm_rmse',
+            'denorm_mse',
             'denorm_mre',
+            'denorm_rmse',
             'params'
         ]
 
@@ -159,10 +159,10 @@ class RandomSearch:
                     best_result['mse'],
                     best_result['mae'],
                     best_result['rmse'],
-                    best_result['denorm_mse'],
                     best_result['denorm_mae'],
-                    best_result['denorm_rmse'],
+                    best_result['denorm_mse'],
                     best_result['denorm_mre'],
+                    best_result['denorm_rmse'],
                     best_result['params']
                 ]
                 result_file.loc[len(result_file)] = row

@@ -173,6 +173,7 @@ class DataModule(pl.LightningModule):
 
         self.normalizer = MinMaxScaler()
         self.data = pd.DataFrame(self.normalizer.fit_transform(self.data), columns=self.data.columns)
+
         self.splitter = None
 
         self.prop_missing = prop_missing
