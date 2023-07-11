@@ -2,8 +2,11 @@ import os
 import json
 import torch
 import itertools
+import numpy as np
 import pandas as pd
+import seaborn as sns
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 from src.experiment.params_optimizer import RandomSearchLoader
 from src.models.gain import GAIN
 from src.data.datasets import DataModule
@@ -162,6 +165,7 @@ class AverageResults:
             'denorm_rmse',
         ]
 
+        self.input_file_path = input_file
         self.input_file = pd.read_csv(input_file)
         self.iterations = iterations
 
@@ -192,8 +196,8 @@ class AverageResults:
         columns = ['dataset', 'model'] + self.columns
         result_file = pd.DataFrame(columns=columns)
 
-        for file in os.listdir(self.folder):
-            if file != 'results.csv':
+        for file in np.sort(os.listdir(self.folder)):
+            if file != 'results.csv' and file.endswith('.csv'):
                 results_path = f'./{self.folder}/{file}'
                 row = self.extract_results(results_path)
                 result_file.loc[len(result_file)] = row
@@ -201,12 +205,13 @@ class AverageResults:
         result_file.to_csv(f'{self.folder}/results.csv', index=False)
 
     def run(self):
+        results_path = f'./{self.folder}'
+
         for i in range(len(self.input_file)):
             row = self.input_file.iloc[i]
             model = row['model']
             dataset = row['dataset']
             hyperparameters = row['params']
-            results_path = f'./{self.folder}'
             experiment = Experiment(
                 model=model,
                 dataset=dataset,
@@ -221,6 +226,67 @@ class AverageResults:
 
         self.make_summary_dataset()
 
+
+class SensitivityAnalysis(AverageResults):
+    def __init__(self, dataset_name=None, missing_percentages=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dataset_name = dataset_name
+        self.missing_percentages = missing_percentages
+
+    def run(self):
+
+        results_path = f'./{self.folder}'
+        datasets = self.input_file['dataset'].unique()
+        for dataset in datasets:
+            if self.dataset_name in dataset:
+                row = self.input_file.loc[self.input_file['dataset'] == dataset]
+                self.dataset_name = dataset.split('_')[0]
+
+        datasets_to_test = [f'{self.dataset_name}_{missing_percentage / 10}_point' for missing_percentage in
+                            self.missing_percentages]
+        datasets_to_test.append(f'{self.dataset_name}_0.25_point')
+        model = row['model'].values[0]
+        hyperparameters = row['params'].values[0]
+
+        for dataset in datasets_to_test:
+            experiment = Experiment(
+                model=model,
+                dataset=dataset,
+                iterations=self.iterations,
+                results_path=results_path,
+                gpu=self.gpu,
+                max_iter_train=self.max_iter_train,
+                default_hyperparameters=hyperparameters,
+                save_file=dataset
+            )
+            experiment.run()
+
+        self.make_summary_dataset()
+        self.create_plot()
+
+    def extract_results(self, results_path):
+        results_model = pd.read_csv(f'{results_path}')
+        name_dataset = results_path.split('/')[-1].split('.csv')[0]
+        res = [name_dataset, self.input_file['model'].values[0]]
+        for column in self.columns[:-1]:
+            variable, suffix = column.split('-')
+            if suffix == 'mean':
+                value = results_model[variable].mean()
+            else:
+                value = results_model[variable].std()
+            res.append(value)
+        res.append(results_model['params'].values[0])
+        return res
+
+    def create_plot(self):
+        results = pd.read_csv(f'{self.folder}/results.csv')[['dataset', 'mae-mean']]
+        results['dataset'] = results['dataset'].apply(lambda x: x.split('_')[1])
+        results['dataset'] = results['dataset'].astype(float)
+
+        sns.set_theme()
+        ax = sns.lineplot(x="dataset", y="mae-mean", data=results)
+        ax.set(xlabel='Missing percentage', ylabel='MAE')
+        plt.savefig(f'{self.folder}/sensitivity_analysis.png')
 
 class RandomSearch:
 

@@ -13,13 +13,13 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 def main(args):
     # Parse arguments
     dataset = args.dataset
-    model = args.model_name
-    miss_rate = args.miss_rate
+    model = args.model
     iterations = args.iterations
     imputation_problem = args.imputation_problem
     early_stopping = args.early_stopping
     dataset = f'{dataset}_{imputation_problem}'
     use_time_gap_matrix = True
+    bi = True
 
     accelerator = 'gpu'
 
@@ -27,8 +27,8 @@ def main(args):
     with open('base_params.json') as f:
         params_dict = json.load(f)
 
-    hyperparameters = {'use_time_gap_matrix': use_time_gap_matrix}
-    for key in ['batch_size', 'learning_rate', 'activation', 'hidden_size']:
+    hyperparameters = {'use_time_gap_matrix': use_time_gap_matrix, 'bi': bi}
+    for key in ['batch_size', 'learning_rate', 'activation', 'hidden_size', 'mlp_layers']:
         hyperparameters[key] = params_dict[key]
 
     hyperparameters = {**hyperparameters, **params_dict[model]}
@@ -37,7 +37,6 @@ def main(args):
     dm = DataModule(
         dataset=dataset,
         batch_size=hyperparameters['batch_size'],
-        prop_missing=miss_rate,
         use_time_gap_matrix=use_time_gap_matrix
     )
 
@@ -68,7 +67,6 @@ def main(args):
         -------------------------- Experiment --------------------------
         Dataset: {dataset}
         Model: {model}
-        Missing rate: {miss_rate}
         Iterations: {iterations}
         Hyperparameters: {hyperparameters}
 
@@ -106,11 +104,6 @@ if __name__ == '__main__':
         choices=['la', 'electric', 'air', 'air-36', 'bay'],
         default='la',
         type=str)
-    parser.add_argument(
-        '--miss_rate',
-        help='missing data probability',
-        default=0.25,
-        type=float)
     parser.add_argument(
         '--iterations',
         help='number of training iterations',

@@ -39,6 +39,20 @@ class HintGenerator:
         hint_matrix = input_mask * hint_matrix.to(input_mask.device)
         return hint_matrix
 
+    def generate_base(self, input_mask: torch.Tensor) -> torch.Tensor:
+
+        batch, time, features = input_mask.size()
+        b_sel = torch.randint(features, size=(batch, time)).to(input_mask.device)
+        b = torch.zeros_like(input_mask, dtype=torch.bool)
+        b.scatter_(2, b_sel.unsqueeze(2), True)
+
+        hint_matrix = input_mask.clone()
+        hint_matrix[b] = 0.5
+        hint_matrix.to(input_mask.device)
+
+        return hint_matrix
+
+
 
 class GAIN(pl.LightningModule):
     def __init__(self, input_size: tuple, edge_index, edge_weights, normalizer, model_type: str = None,
