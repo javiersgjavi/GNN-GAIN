@@ -1,5 +1,7 @@
+import sys
+sys.path.append('./')
 import argparse
-from src.experiment.experiment import AverageResults
+from src.experiment.experiment import AblationStudy
 
 
 def main(args):
@@ -8,9 +10,9 @@ def main(args):
     input_file = args.input_file
 
     name_input_file = input_file.split('/')[-2]
-    folder = f'average_{name_input_file}'
+    folder = f'./results/ablation_{name_input_file}'
 
-    random_search = AverageResults(
+    random_search = AblationStudy(
         iterations=iterations,
         gpu=[gpu],
         max_iter_train=5000,

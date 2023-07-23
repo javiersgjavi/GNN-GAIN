@@ -131,6 +131,44 @@ class Experiment:
             self.save_results_file(results, self.default_hyperparameters)
 
 
+class ExperimentAblation(Experiment):
+    def __init__(self, ablation=None, suffix=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ablation = ablation
+        self.save_file = self.save_file.replace('.csv', f'_{suffix}.csv')
+        self.make_architecture_ablation()
+
+    def make_architecture_ablation(self):
+        if self.ablation == 'no_bi':
+            self.default_hyperparameters['bi'] = False
+        elif self.ablation == 'no_tg':
+            self.default_hyperparameters['use_time_gap_matrix'] = False
+
+    def make_graph_ablation(self, edge_index, edge_weights):
+        if self.ablation == 'fc':
+            edge_weights = np.ones(edge_weights.shape)
+        elif self.ablation == 'nc':
+            num_nodes = edge_index.max() + 1
+            edge_index_arange = np.arange(num_nodes)
+            edge_index = np.array([edge_index_arange, edge_index_arange])
+            edge_weights = np.ones(num_nodes)
+
+        return edge_index, edge_weights
+
+
+    def prepare_data(self):
+        dm = DataModule(dataset=self.dataset, batch_size=self.batch_size, use_time_gap_matrix=self.time_gap)
+        edge_index, edge_weights = dm.get_connectivity()
+        normalizer = dm.get_normalizer()
+        dm.setup()
+
+        if self.accelerator == 'gpu':
+            edge_index = torch.from_numpy(edge_index).to(f'cuda:{self.selected_gpu[0]}')
+            edge_weights = torch.from_numpy(edge_weights).to(f'cuda:{self.selected_gpu[0]}')
+
+        return dm, edge_index, edge_weights, normalizer
+
+
 class RandomSearchExperiment(Experiment):
     def __init__(self, bi=False, model=None, iterations=None, *args, **kwargs):
         self.bi = bi
@@ -176,10 +214,16 @@ class AverageResults:
         columns = list(itertools.product(columns, ['mean', 'std']))
         self.columns = [f'{variable}-{suffix}' for variable, suffix in columns] + ['params']
 
-    def extract_results(self, results_path):
-        results_model = pd.read_csv(f'{results_path}')
+    def get_row_and_name(self, results_path):
         name_dataset = results_path.split('/')[-1].split('.')[0]
         original_row = self.input_file.loc[self.input_file['dataset'] == name_dataset]
+
+        return original_row, name_dataset
+        
+    def extract_results(self, results_path):
+        results_model = pd.read_csv(f'{results_path}')
+        original_row, name_dataset = self.get_row_and_name(results_path)
+
         model = original_row['model'].values[0]
         res = [name_dataset, model]
         for column in self.columns[:-1]:
@@ -226,6 +270,43 @@ class AverageResults:
 
         self.make_summary_dataset()
 
+class AblationStudy(AverageResults):
+
+    def get_row_and_name(self, results_path):
+        original_name_dataset = results_path.split('/')[-1].split('.')[0]
+        original_name_dataset, ablation  = original_name_dataset.split('_ab_')
+        ablation = ablation.split('.')[0]
+        name_dataset = f'{original_name_dataset}_{ablation}'
+        original_row = self.input_file.loc[self.input_file['dataset'] == original_name_dataset]
+
+        return original_row, name_dataset
+
+    def run(self):
+        results_path = f'./{self.folder}'
+        #for i in range(len(self.input_file)):
+        for i in range(1):
+            row = self.input_file.iloc[i]
+            model = row['model']
+            dataset = row['dataset']
+            hyperparameters = row['params']
+
+            for ablation in ['no_bi', 'no_tg', 'fc', 'nc']:
+                experiment = ExperimentAblation(
+                    model=model,
+                    dataset=dataset,
+                    iterations=self.iterations,
+                    results_path=results_path,
+                    gpu=self.gpu,
+                    max_iter_train=self.max_iter_train,
+                    default_hyperparameters=hyperparameters,
+                    save_file=dataset,
+                    suffix=f'ab_{ablation}',
+                    ablation=ablation
+                )
+                experiment.run()
+
+        self.make_summary_dataset()
+                
 
 class SensitivityAnalysis(AverageResults):
     def __init__(self, dataset_name=None, missing_percentages=None, *args, **kwargs):
