@@ -283,8 +283,7 @@ class AblationStudy(AverageResults):
 
     def run(self):
         results_path = f'./{self.folder}'
-        #for i in range(len(self.input_file)):
-        for i in range(1):
+        for i in range(len(self.input_file)):
             row = self.input_file.iloc[i]
             model = row['model']
             dataset = row['dataset']
