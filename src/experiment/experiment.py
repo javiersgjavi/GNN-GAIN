@@ -133,9 +133,10 @@ class Experiment:
 
 class ExperimentAblation(Experiment):
     def __init__(self, ablation=None, suffix=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
         self.ablation = ablation
+        super().__init__(*args, **kwargs)
         self.save_file = self.save_file.replace('.csv', f'_{suffix}.csv')
+        
         self.make_architecture_ablation()
 
     def make_architecture_ablation(self):
@@ -145,6 +146,7 @@ class ExperimentAblation(Experiment):
             self.default_hyperparameters['use_time_gap_matrix'] = False
 
     def make_graph_ablation(self, edge_index, edge_weights):
+
         if self.ablation == 'fc':
             edge_weights = np.ones(edge_weights.shape)
         elif self.ablation == 'nc':
@@ -154,7 +156,6 @@ class ExperimentAblation(Experiment):
             edge_weights = np.ones(num_nodes)
 
         return edge_index, edge_weights
-
 
     def prepare_data(self):
         dm = DataModule(dataset=self.dataset, batch_size=self.batch_size, use_time_gap_matrix=self.time_gap)
@@ -291,6 +292,7 @@ class AblationStudy(AverageResults):
             hyperparameters = row['params']
 
             for ablation in ['no_bi', 'no_tg', 'no_bi_no_tg','fc', 'nc']:
+                print(ablation)
                 experiment = ExperimentAblation(
                     model=model,
                     dataset=dataset,
