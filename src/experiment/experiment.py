@@ -139,9 +139,9 @@ class ExperimentAblation(Experiment):
         self.make_architecture_ablation()
 
     def make_architecture_ablation(self):
-        if self.ablation == 'no_bi':
+        if 'no_bi' in self.ablation:
             self.default_hyperparameters['bi'] = False
-        elif self.ablation == 'no_tg':
+        elif 'no_tg' in self.ablation:
             self.default_hyperparameters['use_time_gap_matrix'] = False
 
     def make_graph_ablation(self, edge_index, edge_weights):
@@ -159,6 +159,7 @@ class ExperimentAblation(Experiment):
     def prepare_data(self):
         dm = DataModule(dataset=self.dataset, batch_size=self.batch_size, use_time_gap_matrix=self.time_gap)
         edge_index, edge_weights = dm.get_connectivity()
+        edge_index, edge_weights = self.make_graph_ablation(edge_index, edge_weights)
         normalizer = dm.get_normalizer()
         dm.setup()
 
@@ -289,7 +290,7 @@ class AblationStudy(AverageResults):
             dataset = row['dataset']
             hyperparameters = row['params']
 
-            for ablation in ['no_bi', 'no_tg', 'fc', 'nc']:
+            for ablation in ['no_bi', 'no_tg', 'no_bi_no_tg','fc', 'nc']:
                 experiment = ExperimentAblation(
                     model=model,
                     dataset=dataset,
