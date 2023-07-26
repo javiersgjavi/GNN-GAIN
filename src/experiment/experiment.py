@@ -136,7 +136,7 @@ class ExperimentAblation(Experiment):
         self.ablation = ablation
         super().__init__(*args, **kwargs)
         self.save_file = self.save_file.replace('.csv', f'_{suffix}.csv')
-        
+
         self.make_architecture_ablation()
 
     def make_architecture_ablation(self):
@@ -147,13 +147,16 @@ class ExperimentAblation(Experiment):
 
     def make_graph_ablation(self, edge_index, edge_weights):
 
+        dtype_w = edge_weights.dtype
+        dtype_e = edge_index.dtype
+
         if self.ablation == 'fc':
-            edge_weights = np.ones(edge_weights.shape)
+            edge_weights = np.ones(edge_weights.shape).astype(dtype_w)
         elif self.ablation == 'nc':
             num_nodes = edge_index.max() + 1
             edge_index_arange = np.arange(num_nodes)
-            edge_index = np.array([edge_index_arange, edge_index_arange])
-            edge_weights = np.ones(num_nodes)
+            edge_index = np.array([edge_index_arange, edge_index_arange]).astype(dtype_e)
+            edge_weights = np.ones(num_nodes).astype(dtype_w)
 
         return edge_index, edge_weights
 
@@ -291,8 +294,8 @@ class AblationStudy(AverageResults):
             dataset = row['dataset']
             hyperparameters = row['params']
 
-            for ablation in ['no_bi', 'no_tg', 'no_bi_no_tg','fc', 'nc']:
-                print(ablation)
+            #for ablation in ['no_bi', 'no_tg', 'no_bi_no_tg','fc', 'nc']:
+            for ablation in ['fc', 'nc']:
                 experiment = ExperimentAblation(
                     model=model,
                     dataset=dataset,
