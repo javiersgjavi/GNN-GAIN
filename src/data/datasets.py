@@ -277,9 +277,20 @@ class DataModule(pl.LightningModule):
 
     def test_dataloader(self):
         return self.test_loader
+    
+    def predict_dataloader(self):
+        return self.test_loader
 
     def get_connectivity(self):
         return self.edge_index, self.edge_weights
 
     def get_normalizer(self):
         return self.normalizer
+    
+class VirtualSensingDataModule(DataModule):
+    def __init__(self, masked=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.masked = masked
+        self.id_to_mask = [np.where(self.data.columns.get_level_values(0) == i)[0][0] for i in self.masked]
+        self.mask[:, self.id_to_mask] = False,
+        self.known_values[:, self.id_to_mask] = False

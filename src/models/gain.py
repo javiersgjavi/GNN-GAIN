@@ -297,3 +297,26 @@ class GAIN(pl.LightningModule):
 
         # Calculate the mean squared error (MSE) between the real and imputed data
         self.calculate_error_imputation(outputs, type_step='test')
+
+    def predict_step(self, batch: Tuple, batch_idx: int, dataloader_idx: int = None) -> torch.Tensor:
+        """
+        Runs a single prediction step on a batch of data.
+
+        Args:
+            batch (Tuple): Tuple of input data, `x_real`, `x`, and `input_mask`.
+            batch_idx (int): Index of the current batch.
+            dataloader_idx (int): Index of the dataloader to use for this step.
+
+        Returns:
+            torch.Tensor: The imputed data for the given batch.
+        """
+
+        x, _, _, input_mask_int, _, time_gap_matrix = batch
+
+        # Forward Generator
+        x_fake, _ = self.generator.forward_g(x=x, input_mask=input_mask_int, time_gap_matrix=time_gap_matrix)
+    
+        x_fake_denorm = self.normalizer.inverse_transform(x_fake.reshape(-1, self.nodes).detach().cpu())
+
+        return x_fake_denorm
+    
