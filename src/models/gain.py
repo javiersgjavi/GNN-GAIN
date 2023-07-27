@@ -39,6 +39,20 @@ class HintGenerator:
         hint_matrix = input_mask * hint_matrix.to(input_mask.device)
         return hint_matrix
 
+    def generate_base(self, input_mask: torch.Tensor) -> torch.Tensor:
+
+        batch, time, features = input_mask.size()
+        b_sel = torch.randint(features, size=(batch, time)).to(input_mask.device)
+        b = torch.zeros_like(input_mask, dtype=torch.bool)
+        b.scatter_(2, b_sel.unsqueeze(2), True)
+
+        hint_matrix = input_mask.clone()
+        hint_matrix[b] = 0.5
+        hint_matrix.to(input_mask.device)
+
+        return hint_matrix
+
+
 
 class GAIN(pl.LightningModule):
     def __init__(self, input_size: tuple, edge_index, edge_weights, normalizer, model_type: str = None,
@@ -283,3 +297,26 @@ class GAIN(pl.LightningModule):
 
         # Calculate the mean squared error (MSE) between the real and imputed data
         self.calculate_error_imputation(outputs, type_step='test')
+
+    def predict_step(self, batch: Tuple, batch_idx: int, dataloader_idx: int = None) -> torch.Tensor:
+        """
+        Runs a single prediction step on a batch of data.
+
+        Args:
+            batch (Tuple): Tuple of input data, `x_real`, `x`, and `input_mask`.
+            batch_idx (int): Index of the current batch.
+            dataloader_idx (int): Index of the dataloader to use for this step.
+
+        Returns:
+            torch.Tensor: The imputed data for the given batch.
+        """
+
+        x, _, _, input_mask_int, _, time_gap_matrix = batch
+
+        # Forward Generator
+        x_fake, _ = self.generator.forward_g(x=x, input_mask=input_mask_int, time_gap_matrix=time_gap_matrix)
+    
+        x_fake_denorm = self.normalizer.inverse_transform(x_fake.reshape(-1, self.nodes).detach().cpu())
+
+        return x_fake_denorm
+    

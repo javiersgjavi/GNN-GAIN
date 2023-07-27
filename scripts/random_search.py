@@ -51,7 +51,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--datasets',
-        help='datasets to optimize separated by commas, e.g. la,bay,air,air-36',
+        help='datasets to optimize separated by commas, e.g. la,bay,air,air-36,electric{missing_prop}',
         default='la,bay',
         type=str)
     parser.add_argument(
@@ -67,13 +67,13 @@ if __name__ == '__main__':
     parser.add_argument(
         '--imputation_problem',
         help='type of imputation problem',
-        choices=['point', 'block', 'point,block', None],
+        choices=['point', 'block', 'point,block', 'block,point', None],
         default=None,
         type=str)
     parser.add_argument(
         '--scenario',
         help='type of imputation scenario',
-        choices=['in', 'out', 'in,out', None],
+        choices=['in', 'out', 'in,out', 'out,in', None],
         default=None,
         type=str)
     parser.add_argument(

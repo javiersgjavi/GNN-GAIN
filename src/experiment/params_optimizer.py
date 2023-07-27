@@ -1,5 +1,8 @@
 import json
+import itertools
+import pandas as pd
 from numpy.random import randint, uniform, choice
+from src.experiment.experiment import RandomSearchExperiment
 
 
 def randint_close_interval(low, high, size=None):
@@ -12,7 +15,7 @@ class RandomSearchLoader:
         self.model_name = model_name
         self.bi = bi
 
-        file = 'params_random_search.json' if not self.bi else 'params_random_search_bi.json'
+        file = 'params_random_search.json'
 
         with open(f'src/experiment/{file}') as f:
             self.params_grid = json.load(f)
@@ -73,3 +76,102 @@ class RandomSearchLoader:
             raise StopIteration
         params_iteration = {k: v[i] for k, v in self.random_params.items()}
         return params_iteration
+
+
+class RandomSearch:
+
+    def __init__(self, models=None, datasets=None, iterations=100, gpu='auto', max_iter_train=5000, bi=None,
+                 time_gap=None, folder='results'):
+
+        self.columns = [
+            'mae',
+            'mse',
+            'rmse',
+            'denorm_mae',
+            'denorm_mse',
+            'denorm_mre',
+            'denorm_rmse',
+            'params'
+        ]
+
+        self.models = models
+        self.datasets = datasets
+        self.iterations = iterations
+
+        self.folder = folder
+        self.gpu = gpu
+        self.max_iter_train = max_iter_train
+        self.bi = bi
+        self.time_gap = time_gap
+
+    def make_summary_dataset(self, datasets, models):
+        columns = ['model'] + self.columns
+
+        for dataset in datasets:
+            results_path = f'./{self.folder}/{dataset}/'
+            result_file = pd.DataFrame(columns=columns)
+            for model in models:
+                results_model = pd.read_csv(f'{results_path}{model}_results.csv')
+                best_result = results_model.iloc[results_model['mae'].idxmin()]
+                row = [
+                    model,
+                    best_result['mse'],
+                    best_result['mae'],
+                    best_result['rmse'],
+                    best_result['denorm_mae'],
+                    best_result['denorm_mse'],
+                    best_result['denorm_mre'],
+                    best_result['denorm_rmse'],
+                    best_result['params']
+                ]
+                result_file.loc[len(result_file)] = row
+
+            result_file.to_csv(f'{results_path}/results.csv', index=False)
+
+    def make_summary_general(self, datasets):
+        columns = ['dataset', 'model'] + self.columns
+        result_file = pd.DataFrame(columns=columns)
+
+        for dataset in datasets:
+            results_dataset_path = f'./{self.folder}/{dataset}/results.csv'
+            results_dataset = pd.read_csv(results_dataset_path)
+
+            best_result = results_dataset.iloc[results_dataset['mae'].idxmin()]
+            row = [
+                dataset,
+                best_result['model'],
+                best_result['mae'],
+                best_result['mse'],
+                best_result['rmse'],
+                best_result['denorm_mae'],
+                best_result['denorm_mse'],
+                best_result['denorm_mre'],
+                best_result['denorm_rmse'],
+                best_result['params']
+            ]
+            result_file.loc[len(result_file)] = row
+
+        result_file.to_csv(f'./{self.folder}/results.csv', index=False)
+
+    def run(self):
+        for dataset, model in itertools.product(self.datasets, self.models):
+            results_path = f'./{self.folder}/{dataset}/'
+
+            param_loader = RandomSearchLoader(model, self.iterations, self.bi)
+            
+            random_search = RandomSearchExperiment(
+                model=model,
+                dataset=dataset,
+                iterations=self.iterations,
+                results_path=results_path,
+                gpu=self.gpu,
+                max_iter_train=self.max_iter_train,
+                bi=self.bi,
+                time_gap=self.time_gap,
+                save_file=f'{model}_results',
+                param_loader=param_loader
+            )
+
+            random_search.run()
+        self.make_summary_dataset(self.datasets, self.models)
+        self.make_summary_general(self.datasets)

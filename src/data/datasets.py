@@ -14,11 +14,13 @@ from src.data.splitters import RatioSplitter, AQICustomInSampleSplitter, AQICust
 
 
 class ElectricDataset:
-    def __init__(self, prop_missing=0.25):
+    def __init__(self, prop_missing=0.1):
         self.prop_missing = prop_missing
-        self.data = pd.read_csv('data/electric/normal.csv')
+        print(self.prop_missing)
+        self.data = pd.read_csv('data/electric/normal.csv').astype(np.float32)
         self.training_mask = np.random.rand(*self.data.shape) > self.prop_missing
-        self.eval_mask = np.ones_like(self.data)
+        self.training_mask = self.training_mask[:, :, np.newaxis]
+        self.eval_mask = np.ones_like(self.data)[:, :, np.newaxis]
         self.edge_index, self.edge_weights = self._calculate_connectivity()
 
     def _calculate_connectivity(self):
@@ -108,7 +110,6 @@ class DataModule(pl.LightningModule):
                  batch_size: int = 128,
                  val_len: float = 0.2,
                  test_len: float = 0.1,
-                 prop_missing: float = 0.2,
                  use_time_gap_matrix: bool = False):
 
         super().__init__()
@@ -156,7 +157,11 @@ class DataModule(pl.LightningModule):
                 time_gap_matrix_f, time_gap_matrix_b = load_time_gap_matrix(base_data, path_time_gap_matrix)
 
         elif dataset.startswith('electric'):
+            prop_missing = float(dataset.split('_')[-2])
             base_data = ElectricDataset(prop_missing=prop_missing)
+            if self.use_time_gap_matrix:
+                path_time_gap_matrix = f'./data/{dataset}/time_gap_matrix'
+                time_gap_matrix_f, time_gap_matrix_b = load_time_gap_matrix(base_data, path_time_gap_matrix)
 
         if not self.use_time_gap_matrix:
             time_gap_matrix_f = np.zeros_like(base_data.training_mask)
@@ -176,8 +181,7 @@ class DataModule(pl.LightningModule):
 
         self.splitter = None
 
-        self.prop_missing = prop_missing
-        self.batch_size = batch_size
+        self.batch_size = batch_size if not self.dataset_name.startswith('electric') else 32
         self.val_len = val_len
         self.test_len = test_len
         self.shape = None
@@ -273,9 +277,20 @@ class DataModule(pl.LightningModule):
 
     def test_dataloader(self):
         return self.test_loader
+    
+    def predict_dataloader(self):
+        return self.test_loader
 
     def get_connectivity(self):
         return self.edge_index, self.edge_weights
 
     def get_normalizer(self):
         return self.normalizer
+    
+class VirtualSensingDataModule(DataModule):
+    def __init__(self, masked=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.masked = masked
+        self.id_to_mask = [np.where(self.data.columns.get_level_values(0) == i)[0][0] for i in self.masked]
+        self.mask[:, self.id_to_mask] = False,
+        self.known_values[:, self.id_to_mask] = False
