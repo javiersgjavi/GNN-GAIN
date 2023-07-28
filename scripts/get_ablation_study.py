@@ -1,7 +1,7 @@
 import sys
 sys.path.append('./')
 import argparse
-from src.experiment.experiment import AblationStudy
+from src.experiment.studies import AblationStudy
 
 
 def main(args):

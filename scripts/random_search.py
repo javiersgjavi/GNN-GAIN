@@ -1,6 +1,8 @@
+import sys
+sys.path.append('./')
 import argparse
 import itertools
-from src.experiment.experiment import RandomSearch
+from src.experiment.params_optimizer import RandomSearch
 
 
 def main(args):

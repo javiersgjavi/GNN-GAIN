@@ -6,7 +6,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_error
 from src.data.datasets import DataModule
-from src.experiment.experiment import Experiment, ExperimentAblation, VirtualSensingExperiment
+from src.experiment.experiment import Experiment, ExperimentAblation, VirtualSensingExperiment, MissingDataSensitivityExperiment
 
 class AverageResults:
     def __init__(self, iterations=5, gpu='auto', max_iter_train=5000, folder='results', input_file=None):
@@ -37,11 +37,11 @@ class AverageResults:
 
         return original_row, name_dataset
         
-    def extract_results(self, results_path):
+    def extract_results(self, results_path, model=None):
         results_model = pd.read_csv(f'{results_path}')
         original_row, name_dataset = self.get_row_and_name(results_path)
 
-        model = original_row['model'].values[0]
+        model = original_row['model'].values[0] if model is None else model
         res = [name_dataset, model]
         for column in self.columns[:-1]:
             variable, suffix = column.split('-')
@@ -53,14 +53,14 @@ class AverageResults:
         res.append(results_model['params'].values[0])
         return res
 
-    def make_summary_dataset(self):
+    def make_summary_dataset(self, model=None):
         columns = ['dataset', 'model'] + self.columns
         result_file = pd.DataFrame(columns=columns)
 
         for file in np.sort(os.listdir(self.folder)):
             if file != 'results.csv' and file.endswith('.csv'):
                 results_path = f'./{self.folder}/{file}'
-                row = self.extract_results(results_path)
+                row = self.extract_results(results_path, model)
                 result_file.loc[len(result_file)] = row
 
         result_file.to_csv(f'{self.folder}/results.csv', index=False)
@@ -122,68 +122,7 @@ class AblationStudy(AverageResults):
                 experiment.run()
 
         self.make_summary_dataset()        
-                
-class SensitivityAnalysis(AverageResults):
-    def __init__(self, dataset_name=None, missing_percentages=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.dataset_name = dataset_name
-        self.missing_percentages = missing_percentages
-
-    def run(self):
-
-        results_path = f'./{self.folder}'
-        datasets = self.input_file['dataset'].unique()
-        for dataset in datasets:
-            if self.dataset_name in dataset:
-                row = self.input_file.loc[self.input_file['dataset'] == dataset]
-                self.dataset_name = dataset.split('_')[0]
-
-        datasets_to_test = [f'{self.dataset_name}_{missing_percentage / 10}_point' for missing_percentage in
-                            self.missing_percentages]
-        datasets_to_test.append(f'{self.dataset_name}_0.25_point')
-        model = row['model'].values[0]
-        hyperparameters = row['params'].values[0]
-
-        for dataset in datasets_to_test:
-            experiment = Experiment(
-                model=model,
-                dataset=dataset,
-                iterations=self.iterations,
-                results_path=results_path,
-                gpu=self.gpu,
-                max_iter_train=self.max_iter_train,
-                default_hyperparameters=hyperparameters,
-                save_file=dataset
-            )
-            experiment.run()
-
-        self.make_summary_dataset()
-        self.create_plot()
-
-    def extract_results(self, results_path):
-        results_model = pd.read_csv(f'{results_path}')
-        name_dataset = results_path.split('/')[-1].split('.csv')[0]
-        res = [name_dataset, self.input_file['model'].values[0]]
-        for column in self.columns[:-1]:
-            variable, suffix = column.split('-')
-            if suffix == 'mean':
-                value = results_model[variable].mean()
-            else:
-                value = results_model[variable].std()
-            res.append(value)
-        res.append(results_model['params'].values[0])
-        return res
-
-    def create_plot(self):
-        results = pd.read_csv(f'{self.folder}/results.csv')[['dataset', 'mae-mean']]
-        results['dataset'] = results['dataset'].apply(lambda x: x.split('_')[1])
-        results['dataset'] = results['dataset'].astype(float)
-
-        sns.set_theme()
-        ax = sns.lineplot(x="dataset", y="mae-mean", data=results)
-        ax.set(xlabel='Missing percentage', ylabel='MAE')
-        plt.savefig(f'{self.folder}/sensitivity_analysis.png')
-
+          
 class VirtualSensingStudy(AverageResults):
     def __init__(self, masked=None, dataset=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -260,10 +199,50 @@ class VirtualSensingStudy(AverageResults):
                 mae_column[key].append(np.mean(maes_it[key]))
 
         return mae_column
+    
+      
+class MissingDataSensitivityStudy(AverageResults):
+    def __init__(self, dataset_name=None, p_noises=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dataset_name = dataset_name
+        self.p_noises = p_noises
 
+    def run(self):
+        results_path = f'./{self.folder}'
 
+        row = self.input_file.loc[self.input_file['dataset'] == self.dataset_name]
+        model = row['model'].values[0]
+        hyperparameters = row['params'].values[0]
 
+        for p_noise in self.p_noises:
+            experiment = MissingDataSensitivityExperiment(
+                model=model,
+                dataset=self.dataset_name,
+                iterations=self.iterations,
+                results_path=results_path,
+                gpu=self.gpu,
+                max_iter_train=self.max_iter_train,
+                default_hyperparameters=hyperparameters,
+                save_file=self.dataset_name,
+                p_noise=p_noise
+            )
+            experiment.run()
 
+    
+        self.make_summary_dataset(model) 
+        self.create_plot()
 
-        
+    def create_plot(self):
+        df = pd.read_csv(f'{self.folder}/results.csv')
+        res = pd.DataFrame(columns = ['model']+[i for i in range(10, 100, 10)]).set_index('model')
+        res.loc['TG-GAIN'] = df['denorm_mae-mean'].values
+        res.loc['GRIN'] = [1.87, 1.9, 1.94, 1.98, 2.04, 2.11, 2.22, 2.40, 2.84]
+        res.loc['BRITS'] = [2.32, 2.34, 2.36, 2.40, 2.47, 2.57, 2.76, 3.08, 4.02]
 
+        sns.set_theme()
+        sns.lineplot(x=res.columns, y=res.loc['TG-GAIN'], label='TG-GAIN')
+        sns.lineplot(x=res.columns, y=res.loc['GRIN'], label='GRIN')
+        sns.lineplot(x=res.columns, y=res.loc['BRITS'], label='BRITS')
+        plt.xlabel('Missing percentage')
+        plt.ylabel('MAE')
+        plt.savefig(f'{self.folder}/sensitivity_analysis.png', dpi=300)
