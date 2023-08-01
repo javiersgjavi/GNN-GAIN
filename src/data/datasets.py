@@ -119,10 +119,8 @@ class DataModule(pl.LightningModule):
         self.use_time_gap_matrix = use_time_gap_matrix
         # Load the data from a CSV file based on the specified dataset name
 
-        if dataset.endswith('_point'):
-            p_fault_base, p_noise_base = 0., 0.25
-        elif dataset.endswith('_block'):
-            p_fault_base, p_noise_base = 0.0015, 0.05
+        p_fault_base = 0. if dataset.endswith('_point') else 0.0015
+        p_noise_base = 0.25 if dataset.endswith('_point') else 0.05
 
         p_fault = p_fault_base if p_fault is None else p_fault
         p_noise = p_noise_base if p_noise is None else p_noise

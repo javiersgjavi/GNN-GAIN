@@ -8,6 +8,7 @@ from src.models.gain import GAIN
 from src.data.datasets import DataModule, VirtualSensingDataModule
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 
 def print_dict(dictionary, max_iter_train):
@@ -95,12 +96,17 @@ class Experiment:
             params=hyperparameters,
         )
 
+        #scheduler_class = CosineAnnealingLR
+        #scheduler_params = {'eta_min': 0.0001, 'T_max': self.max_iter_train}
+        early_stopping = EarlyStopping(monitor='denorm_mse', patience=1, mode='min')
         self.trainer = Trainer(
             max_steps=self.max_iter_train,
             default_root_dir='reports/logs_experiments',
             accelerator=self.accelerator,
             devices=self.selected_gpu,
-            callbacks=[EarlyStopping(monitor='denorm_mse', patience=1, mode='min')],
+            gradient_clip_val=5.,
+            gradient_clip_algorithm='norm',
+            callbacks=[early_stopping],
         )
 
         self.trainer.fit(self.model, datamodule=self.dm)

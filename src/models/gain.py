@@ -4,6 +4,7 @@ import pytorch_lightning as pl
 from typing import Dict, Tuple
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from torchmetrics import MeanAbsoluteError
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from src.models.geometric.gnn_models import STCN, GRUGCN, RNNEncGCNDec, GatedGraphNetwork, DCRNN
 from src.models.geometric.gnn_models_bi import STCNBI, GRUGCNBI, RNNEncGCNDecBI, GatedGraphNetworkBI, DCRNNBI
@@ -239,9 +240,17 @@ class GAIN(pl.LightningModule):
         """
             Configure the optimizers for the GAN model.
         """
-        opt_d = torch.optim.Adam(self.discriminator.parameters(), lr=self.args['learning_rate'])
-        opt_g = torch.optim.Adam(self.generator.parameters(), lr=self.args['learning_rate'])
-        return opt_d, opt_g
+        opt_d = torch.optim.Adam(self.discriminator.parameters(), lr=self.args['learning_rate'], weight_decay=0)
+        opt_g = torch.optim.Adam(self.generator.parameters(), lr=self.args['learning_rate'], weight_decay=0)
+
+        # define schedulers
+        d_scheduler = CosineAnnealingLR(opt_d, T_max=5000, eta_min=0.0001)
+        g_scheduler = CosineAnnealingLR(opt_g, T_max=5000, eta_min=0.0001)
+
+        d_opt_params = {'optimizer': opt_d, 'lr_scheduler': d_scheduler}
+        g_opt_params = {'optimizer': opt_g, 'lr_scheduler': g_scheduler}
+
+        return d_opt_params, g_opt_params
 
     def training_step(self, batch: Tuple, batch_idx: int, optimizer_idx: int) -> torch.Tensor:
         """

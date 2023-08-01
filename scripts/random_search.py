@@ -87,13 +87,13 @@ if __name__ == '__main__':
         '--bi',
         help='If the model is bidirectional',
         choices=[0, 1],
-        default='0',
+        default='1',
         type=int)
     parser.add_argument(
         '--time_gap',
         help='If the model uses the time_gap matrix',
         choices=[0, 1],
-        default='0',
+        default='1',
         type=int)
     parser.add_argument(
         '--folder',
