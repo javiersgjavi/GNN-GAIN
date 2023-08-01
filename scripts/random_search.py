@@ -34,6 +34,7 @@ def main(args):
 
     datasets = [f'{dataset}_{label}' for dataset, label in itertools.product(datasets, labels)]
 
+    folder = f'./results/{folder}'
     random_search = RandomSearch(
         models=models,
         datasets=datasets,
