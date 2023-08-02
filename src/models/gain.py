@@ -244,14 +244,13 @@ class GAIN(pl.LightningModule):
         opt_g = torch.optim.Adam(self.generator.parameters(), lr=self.args['learning_rate'], weight_decay=0)
 
         # define schedulers
-        # d_scheduler = CosineAnnealingLR(opt_d, T_max=5000, eta_min=0.0001)
-        # g_scheduler = CosineAnnealingLR(opt_g, T_max=5000, eta_min=0.0001)
+        d_scheduler = CosineAnnealingLR(opt_d, T_max=5000, eta_min=0.0001)
+        g_scheduler = CosineAnnealingLR(opt_g, T_max=5000, eta_min=0.0001)
 
-        # d_opt_params = {'optimizer': opt_d, 'lr_scheduler': d_scheduler}
-        # g_opt_params = {'optimizer': opt_g, 'lr_scheduler': g_scheduler}
+        d_opt_params = {'optimizer': opt_d, 'lr_scheduler': d_scheduler}
+        g_opt_params = {'optimizer': opt_g, 'lr_scheduler': g_scheduler}
 
-        #return d_opt_params, g_opt_params
-        return opt_d, opt_g
+        return d_opt_params, g_opt_params
 
     def training_step(self, batch: Tuple, batch_idx: int, optimizer_idx: int) -> torch.Tensor:
         """
@@ -277,18 +276,6 @@ class GAIN(pl.LightningModule):
 
         # Select the appropriate loss based on the optimizer index
         loss = d_loss if optimizer_idx == 0 else g_loss
-        '''rate = 5
-
-        if self.i_iterations % rate == 0 and optimizer_idx == 0:
-           # print(self.i_iterations,'d_loss')
-            loss = d_loss
-        elif optimizer_idx == 1:
-           # print(self.i_iterations, 'g_loss')
-            loss = g_loss
-        else:
-            loss = torch.tensor(0.0, requires_grad=True)
-
-        self.i_iterations += 1'''
 
         return loss
 

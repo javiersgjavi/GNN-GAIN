@@ -96,16 +96,14 @@ class Experiment:
             params=hyperparameters,
         )
 
-        #scheduler_class = CosineAnnealingLR
-        #scheduler_params = {'eta_min': 0.0001, 'T_max': self.max_iter_train}
         early_stopping = EarlyStopping(monitor='denorm_mse', patience=1, mode='min')
         self.trainer = Trainer(
             max_steps=self.max_iter_train,
             default_root_dir='reports/logs_experiments',
             accelerator=self.accelerator,
             devices=self.selected_gpu,
-            #gradient_clip_val=5.,
-            #gradient_clip_algorithm='norm',
+            gradient_clip_val=5.,
+            gradient_clip_algorithm='norm',
             callbacks=[early_stopping],
         )
 
