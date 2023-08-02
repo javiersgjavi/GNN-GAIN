@@ -104,8 +104,8 @@ class Experiment:
             default_root_dir='reports/logs_experiments',
             accelerator=self.accelerator,
             devices=self.selected_gpu,
-            gradient_clip_val=5.,
-            gradient_clip_algorithm='norm',
+            #gradient_clip_val=5.,
+            #gradient_clip_algorithm='norm',
             callbacks=[early_stopping],
         )
 

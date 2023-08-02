@@ -41,7 +41,6 @@ class HintGenerator:
         return hint_matrix
 
     def generate_base(self, input_mask: torch.Tensor) -> torch.Tensor:
-
         batch, time, features = input_mask.size()
         b_sel = torch.randint(features, size=(batch, time)).to(input_mask.device)
         b = torch.zeros_like(input_mask, dtype=torch.bool)
@@ -52,7 +51,6 @@ class HintGenerator:
         hint_matrix.to(input_mask.device)
 
         return hint_matrix
-
 
 
 class GAIN(pl.LightningModule):
@@ -103,6 +101,7 @@ class GAIN(pl.LightningModule):
         self.loss_mse = torch.nn.MSELoss()
         self.mae = MeanAbsoluteError()
 
+        #edge_weights = torch.where(edge_weights < 0.1, torch.tensor(0, device=edge_index.device), edge_weights)
         args = {
             'periods': input_size[0],
             'nodes': self.nodes,
@@ -215,7 +214,8 @@ class GAIN(pl.LightningModule):
         x, x_real, input_mask_bool, input_mask_int, known_values, time_gap_matrix = batch
 
         # Forward Generator
-        x_fake, imputation = self.generator.forward_g(x=x, input_mask=input_mask_int, time_gap_matrix=time_gap_matrix) # tengo que recibir las dos
+        x_fake, imputation = self.generator.forward_g(x=x, input_mask=input_mask_int,
+                                                      time_gap_matrix=time_gap_matrix)  # tengo que recibir las dos
 
         # Generate Hint Matrix
         hint_matrix = self.hint_generator.generate(input_mask_int)
@@ -244,13 +244,14 @@ class GAIN(pl.LightningModule):
         opt_g = torch.optim.Adam(self.generator.parameters(), lr=self.args['learning_rate'], weight_decay=0)
 
         # define schedulers
-        d_scheduler = CosineAnnealingLR(opt_d, T_max=5000, eta_min=0.0001)
-        g_scheduler = CosineAnnealingLR(opt_g, T_max=5000, eta_min=0.0001)
+        # d_scheduler = CosineAnnealingLR(opt_d, T_max=5000, eta_min=0.0001)
+        # g_scheduler = CosineAnnealingLR(opt_g, T_max=5000, eta_min=0.0001)
 
-        d_opt_params = {'optimizer': opt_d, 'lr_scheduler': d_scheduler}
-        g_opt_params = {'optimizer': opt_g, 'lr_scheduler': g_scheduler}
+        # d_opt_params = {'optimizer': opt_d, 'lr_scheduler': d_scheduler}
+        # g_opt_params = {'optimizer': opt_g, 'lr_scheduler': g_scheduler}
 
-        return d_opt_params, g_opt_params
+        #return d_opt_params, g_opt_params
+        return opt_d, opt_g
 
     def training_step(self, batch: Tuple, batch_idx: int, optimizer_idx: int) -> torch.Tensor:
         """
@@ -276,6 +277,18 @@ class GAIN(pl.LightningModule):
 
         # Select the appropriate loss based on the optimizer index
         loss = d_loss if optimizer_idx == 0 else g_loss
+        '''rate = 5
+
+        if self.i_iterations % rate == 0 and optimizer_idx == 0:
+           # print(self.i_iterations,'d_loss')
+            loss = d_loss
+        elif optimizer_idx == 1:
+           # print(self.i_iterations, 'g_loss')
+            loss = g_loss
+        else:
+            loss = torch.tensor(0.0, requires_grad=True)
+
+        self.i_iterations += 1'''
 
         return loss
 
@@ -324,8 +337,7 @@ class GAIN(pl.LightningModule):
 
         # Forward Generator
         x_fake, _ = self.generator.forward_g(x=x, input_mask=input_mask_int, time_gap_matrix=time_gap_matrix)
-    
+
         x_fake_denorm = self.normalizer.inverse_transform(x_fake.reshape(-1, self.nodes).detach().cpu())
 
         return x_fake_denorm
-    
