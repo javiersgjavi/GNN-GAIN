@@ -94,6 +94,7 @@ class Experiment:
             edge_weights=self.edge_weights,
             normalizer=self.normalizer,
             params=hyperparameters,
+            alpha=hyperparameters['alpha'],
         )
 
         early_stopping = EarlyStopping(monitor='denorm_mse', patience=1, mode='min')
@@ -178,15 +179,17 @@ class ExperimentAblation(Experiment):
 
         return dm, edge_index, edge_weights, normalizer
 
+
 class VirtualSensingExperiment(Experiment):
     def __init__(self, masked=None, *args, **kwargs):
-        self.masked=masked
+        self.masked = masked
         super().__init__(*args, **kwargs)
-        self.predictions = {i:None for i in range(self.iterations)}
+        self.predictions = {i: None for i in range(self.iterations)}
         self.exp_name = 'Virtual sensing experiment'
 
     def prepare_data(self):
-        dm = VirtualSensingDataModule(dataset=self.dataset, batch_size=self.batch_size, use_time_gap_matrix=self.time_gap, masked=self.masked)
+        dm = VirtualSensingDataModule(dataset=self.dataset, batch_size=self.batch_size,
+                                      use_time_gap_matrix=self.time_gap, masked=self.masked)
         edge_index, edge_weights = dm.get_connectivity()
         normalizer = dm.get_normalizer()
         dm.setup()
@@ -212,13 +215,13 @@ class VirtualSensingExperiment(Experiment):
 
 class MissingDataSensitivityExperiment(Experiment):
     def __init__(self, p_noise, *args, **kwargs):
-        
         self.p_noise = p_noise
         super().__init__(*args, **kwargs)
         self.exp_name = 'Missing data sensitivity experiment'
 
     def prepare_data(self):
-        dm = DataModule(dataset=self.dataset, batch_size=self.batch_size, use_time_gap_matrix=self.time_gap, p_noise=self.p_noise)
+        dm = DataModule(dataset=self.dataset, batch_size=self.batch_size, use_time_gap_matrix=self.time_gap,
+                        p_noise=self.p_noise)
         edge_index, edge_weights = dm.get_connectivity()
         normalizer = dm.get_normalizer()
         dm.setup()
@@ -232,6 +235,7 @@ class MissingDataSensitivityExperiment(Experiment):
         self.results_file = self.load_file()
 
         return dm, edge_index, edge_weights, normalizer
+
 
 class RandomSearchExperiment(Experiment):
     def __init__(self, bi=False, param_loader=None, *args, **kwargs):
@@ -255,4 +259,3 @@ class RandomSearchExperiment(Experiment):
             print_dict(hyperparameters, self.max_iter_train)
             results = self.train_test(hyperparameters)
             self.save_results_file(results, hyperparameters)
-
