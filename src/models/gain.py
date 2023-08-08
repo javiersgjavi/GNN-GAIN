@@ -95,7 +95,7 @@ class GAIN(pl.LightningModule):
 
         model = model_class_bi[model_type] if params['bi'] else model_class[model_type]
 
-        self.alpha = alpha
+        self.alpha = alpha if alpha is not None else 100
         self.nodes = input_size[1]
         self.normalizer = normalizer
         self.loss_mse = torch.nn.MSELoss()

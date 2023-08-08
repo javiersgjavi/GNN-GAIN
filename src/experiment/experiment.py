@@ -94,7 +94,7 @@ class Experiment:
             edge_weights=self.edge_weights,
             normalizer=self.normalizer,
             params=hyperparameters,
-            alpha=hyperparameters['alpha'],
+            alpha=hyperparameters['alpha'] if 'alpha' in hyperparameters.keys() else None,
         )
 
         early_stopping = EarlyStopping(monitor='denorm_mse', patience=1, mode='min')
