@@ -1,6 +1,8 @@
+import sys
+sys.path.append('./')
 import argparse
 import itertools
-from src.experiment.experiment import RandomSearch
+from src.experiment.params_optimizer import RandomSearch
 
 
 def main(args):
@@ -32,6 +34,7 @@ def main(args):
 
     datasets = [f'{dataset}_{label}' for dataset, label in itertools.product(datasets, labels)]
 
+    folder = f'./results/{folder}'
     random_search = RandomSearch(
         models=models,
         datasets=datasets,
@@ -85,13 +88,13 @@ if __name__ == '__main__':
         '--bi',
         help='If the model is bidirectional',
         choices=[0, 1],
-        default='0',
+        default='1',
         type=int)
     parser.add_argument(
         '--time_gap',
         help='If the model uses the time_gap matrix',
         choices=[0, 1],
-        default='0',
+        default='1',
         type=int)
     parser.add_argument(
         '--folder',

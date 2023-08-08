@@ -90,7 +90,7 @@ class DatasetLoader(Dataset):
             self.known_values[idx], {'forward': self.time_gap_matrix_f[idx], 'backward': self.time_gap_matrix_b[idx]}
 
     def get_missing_rate(self):
-        print(f'Missing percentaje: {np.round(np.mean(self.input_mask_int == 0) * 100, 2)}')
+        return np.round(np.mean(self.input_mask_int == 0) * 100, 2)
 
 
 class DataModule(pl.LightningModule):
@@ -110,17 +110,20 @@ class DataModule(pl.LightningModule):
                  batch_size: int = 128,
                  val_len: float = 0.2,
                  test_len: float = 0.1,
-                 use_time_gap_matrix: bool = False):
+                 use_time_gap_matrix: bool = False,
+                 p_fault: float = None,
+                 p_noise: float = None):
 
         super().__init__()
 
         self.use_time_gap_matrix = use_time_gap_matrix
         # Load the data from a CSV file based on the specified dataset name
 
-        if dataset.endswith('_point'):
-            p_fault, p_noise = 0., 0.25
-        elif dataset.endswith('_block'):
-            p_fault, p_noise = 0.0015, 0.05
+        p_fault_base = 0. if dataset.endswith('_point') else 0.0015
+        p_noise_base = 0.25 if dataset.endswith('_point') else 0.05
+
+        p_fault = p_fault_base if p_fault is None else p_fault
+        p_noise = p_noise_base if p_noise is None else p_noise
 
         if self.use_time_gap_matrix:
             os.makedirs(f'./data/{dataset}/', exist_ok=True)
@@ -188,6 +191,8 @@ class DataModule(pl.LightningModule):
         self.train_loader = None
         self.val_loader = None
         self.test_loader = None
+
+        self.missing_rate = None
 
     def setup(self, stage=None):
         """
@@ -264,7 +269,9 @@ class DataModule(pl.LightningModule):
         self.val_loader = DataLoader(data_val, batch_size=self.batch_size, shuffle=False)
         self.test_loader = DataLoader(data_test, batch_size=self.batch_size, shuffle=False)
 
-        data_train.get_missing_rate()
+        self.missing_rate = data_train.get_missing_rate()
+        
+        print(f'Missing percentaje: {self.missing_rate}')
 
     def input_size(self):
         return self.shape[1:]
@@ -286,6 +293,9 @@ class DataModule(pl.LightningModule):
 
     def get_normalizer(self):
         return self.normalizer
+    
+    def get_missing_rate(self):
+        return self.missing_rate
     
 class VirtualSensingDataModule(DataModule):
     def __init__(self, masked=None, *args, **kwargs):

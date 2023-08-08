@@ -1,5 +1,7 @@
+import sys
+sys.path.append('./')
 import argparse
-from src.experiment.experiment import SensitivityAnalysis
+from src.experiment.studies import MissingDataSensitivityStudy
 
 
 def main(args):
@@ -9,16 +11,19 @@ def main(args):
     dataset = args.dataset
 
     name_input_file = input_file.split('/')[-2]
-    folder = f'sensitivity_{dataset}_{name_input_file}'
+    folder = f'results/missing_{dataset}_{name_input_file}'
 
-    random_search = SensitivityAnalysis(
+    if dataset == 'la_point':
+        p_noises = [0.021, 0.134, 0.23, 0.348, 0.457, 0.565, 0.674, 0.783, 0.893]
+
+    random_search = MissingDataSensitivityStudy(
         dataset_name=dataset,
         iterations=iterations,
         gpu=[gpu],
         max_iter_train=5000,
         folder=folder,
         input_file=input_file,
-        missing_percentages=range(1, 10)
+        p_noises=p_noises
     )
 
     random_search.run()
@@ -44,7 +49,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--dataset',
         help='Dataset to run the sensitivity analysis',
-        default='electric',
+        default='la_point',
     )
 
     args = parser.parse_args()

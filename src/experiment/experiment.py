@@ -8,6 +8,7 @@ from src.models.gain import GAIN
 from src.data.datasets import DataModule, VirtualSensingDataModule
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 
 def print_dict(dictionary, max_iter_train):
@@ -57,6 +58,7 @@ class Experiment:
         self.results_file = self.load_file()
         self.model = None
         self.trainer = None
+        self.exp_name = 'Basic experiment'
 
         self.dm, self.edge_index, self.edge_weights, self.normalizer = self.prepare_data()
 
@@ -92,14 +94,18 @@ class Experiment:
             edge_weights=self.edge_weights,
             normalizer=self.normalizer,
             params=hyperparameters,
+            alpha=hyperparameters['alpha'] if 'alpha' in hyperparameters.keys() else None,
         )
 
+        early_stopping = EarlyStopping(monitor='denorm_mse', patience=1, mode='min')
         self.trainer = Trainer(
             max_steps=self.max_iter_train,
             default_root_dir='reports/logs_experiments',
             accelerator=self.accelerator,
             devices=self.selected_gpu,
-            callbacks=[EarlyStopping(monitor='denorm_mse', patience=1, mode='min')],
+            gradient_clip_val=5.,
+            gradient_clip_algorithm='norm',
+            callbacks=[early_stopping],
         )
 
         self.trainer.fit(self.model, datamodule=self.dm)
@@ -124,7 +130,7 @@ class Experiment:
 
     def run(self):
         for _ in tqdm(range(self.results_file.shape[0], self.iterations),
-                      desc=f'Random Search with {self.model_name} in {self.dataset}'):
+                      desc=f'{self.exp_name} with {self.model_name} in {self.dataset}'):
             results = self.train_test(self.default_hyperparameters)
             self.save_results_file(results, self.default_hyperparameters)
 
@@ -134,6 +140,8 @@ class ExperimentAblation(Experiment):
         self.ablation = ablation
         super().__init__(*args, **kwargs)
         self.save_file = self.save_file.replace('.csv', f'_{suffix}.csv')
+        self.results_file = self.load_file()
+        self.exp_name = 'Ablation experiment'
 
         self.make_architecture_ablation()
 
@@ -171,14 +179,17 @@ class ExperimentAblation(Experiment):
 
         return dm, edge_index, edge_weights, normalizer
 
+
 class VirtualSensingExperiment(Experiment):
     def __init__(self, masked=None, *args, **kwargs):
-        self.masked=masked
+        self.masked = masked
         super().__init__(*args, **kwargs)
-        self.predictions = {i:None for i in range(self.iterations)}
+        self.predictions = {i: None for i in range(self.iterations)}
+        self.exp_name = 'Virtual sensing experiment'
 
     def prepare_data(self):
-        dm = VirtualSensingDataModule(dataset=self.dataset, batch_size=self.batch_size, use_time_gap_matrix=self.time_gap, masked=self.masked)
+        dm = VirtualSensingDataModule(dataset=self.dataset, batch_size=self.batch_size,
+                                      use_time_gap_matrix=self.time_gap, masked=self.masked)
         edge_index, edge_weights = dm.get_connectivity()
         normalizer = dm.get_normalizer()
         dm.setup()
@@ -195,11 +206,35 @@ class VirtualSensingExperiment(Experiment):
 
     def run(self):
         for i in tqdm(range(self.results_file.shape[0], self.iterations),
-                      desc=f'Random Search with {self.model_name} in {self.dataset}'):
+                      desc=f'{self.exp_name} with {self.model_name} in {self.dataset}'):
             _ = self.train_test(self.default_hyperparameters)
             self.predictions[i] = self.get_predictions()
 
         return self.predictions
+
+
+class MissingDataSensitivityExperiment(Experiment):
+    def __init__(self, p_noise, *args, **kwargs):
+        self.p_noise = p_noise
+        super().__init__(*args, **kwargs)
+        self.exp_name = 'Missing data sensitivity experiment'
+
+    def prepare_data(self):
+        dm = DataModule(dataset=self.dataset, batch_size=self.batch_size, use_time_gap_matrix=self.time_gap,
+                        p_noise=self.p_noise)
+        edge_index, edge_weights = dm.get_connectivity()
+        normalizer = dm.get_normalizer()
+        dm.setup()
+
+        if self.accelerator == 'gpu':
+            edge_index = torch.from_numpy(edge_index).to(f'cuda:{self.selected_gpu[0]}')
+            edge_weights = torch.from_numpy(edge_weights).to(f'cuda:{self.selected_gpu[0]}')
+
+        percentage = dm.get_missing_rate()
+        self.save_file = self.save_file.replace('.csv', f'_{int(round(percentage, -1))}.csv')
+        self.results_file = self.load_file()
+
+        return dm, edge_index, edge_weights, normalizer
 
 
 class RandomSearchExperiment(Experiment):
@@ -210,6 +245,8 @@ class RandomSearchExperiment(Experiment):
 
         super().__init__(batch_size=batch_size, *args, **kwargs)
 
+        self.exp_name = 'Random search experiment'
+
     def train_test(self, hyperparameters):
         hyperparameters['use_time_gap_matrix'] = self.time_gap
         hyperparameters['bi'] = self.bi
@@ -217,9 +254,8 @@ class RandomSearchExperiment(Experiment):
 
     def run(self):
         for i in tqdm(range(self.results_file.shape[0], self.iterations),
-                      desc=f'Random Search with {self.model_name} in {self.dataset}'):
+                      desc=f'{self.exp_name} with {self.model_name} in {self.dataset}'):
             hyperparameters = self.params_loader.get_params(i)
             print_dict(hyperparameters, self.max_iter_train)
             results = self.train_test(hyperparameters)
             self.save_results_file(results, hyperparameters)
-

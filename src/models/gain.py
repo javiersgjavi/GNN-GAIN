@@ -4,6 +4,7 @@ import pytorch_lightning as pl
 from typing import Dict, Tuple
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from torchmetrics import MeanAbsoluteError
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from src.models.geometric.gnn_models import STCN, GRUGCN, RNNEncGCNDec, GatedGraphNetwork, DCRNN
 from src.models.geometric.gnn_models_bi import STCNBI, GRUGCNBI, RNNEncGCNDecBI, GatedGraphNetworkBI, DCRNNBI
@@ -40,7 +41,6 @@ class HintGenerator:
         return hint_matrix
 
     def generate_base(self, input_mask: torch.Tensor) -> torch.Tensor:
-
         batch, time, features = input_mask.size()
         b_sel = torch.randint(features, size=(batch, time)).to(input_mask.device)
         b = torch.zeros_like(input_mask, dtype=torch.bool)
@@ -51,7 +51,6 @@ class HintGenerator:
         hint_matrix.to(input_mask.device)
 
         return hint_matrix
-
 
 
 class GAIN(pl.LightningModule):
@@ -96,12 +95,13 @@ class GAIN(pl.LightningModule):
 
         model = model_class_bi[model_type] if params['bi'] else model_class[model_type]
 
-        self.alpha = alpha
+        self.alpha = alpha if alpha is not None else 100
         self.nodes = input_size[1]
         self.normalizer = normalizer
         self.loss_mse = torch.nn.MSELoss()
         self.mae = MeanAbsoluteError()
 
+        #edge_weights = torch.where(edge_weights < 0.1, torch.tensor(0, device=edge_index.device), edge_weights)
         args = {
             'periods': input_size[0],
             'nodes': self.nodes,
@@ -214,7 +214,8 @@ class GAIN(pl.LightningModule):
         x, x_real, input_mask_bool, input_mask_int, known_values, time_gap_matrix = batch
 
         # Forward Generator
-        x_fake, imputation = self.generator.forward_g(x=x, input_mask=input_mask_int, time_gap_matrix=time_gap_matrix) # tengo que recibir las dos
+        x_fake, imputation = self.generator.forward_g(x=x, input_mask=input_mask_int,
+                                                      time_gap_matrix=time_gap_matrix)  # tengo que recibir las dos
 
         # Generate Hint Matrix
         hint_matrix = self.hint_generator.generate(input_mask_int)
@@ -239,9 +240,17 @@ class GAIN(pl.LightningModule):
         """
             Configure the optimizers for the GAN model.
         """
-        opt_d = torch.optim.Adam(self.discriminator.parameters(), lr=self.args['learning_rate'])
-        opt_g = torch.optim.Adam(self.generator.parameters(), lr=self.args['learning_rate'])
-        return opt_d, opt_g
+        opt_d = torch.optim.Adam(self.discriminator.parameters(), lr=self.args['learning_rate'], weight_decay=0)
+        opt_g = torch.optim.Adam(self.generator.parameters(), lr=self.args['learning_rate'], weight_decay=0)
+
+        # define schedulers
+        d_scheduler = CosineAnnealingLR(opt_d, T_max=5000, eta_min=0.0001)
+        g_scheduler = CosineAnnealingLR(opt_g, T_max=5000, eta_min=0.0001)
+
+        d_opt_params = {'optimizer': opt_d, 'lr_scheduler': d_scheduler}
+        g_opt_params = {'optimizer': opt_g, 'lr_scheduler': g_scheduler}
+
+        return d_opt_params, g_opt_params
 
     def training_step(self, batch: Tuple, batch_idx: int, optimizer_idx: int) -> torch.Tensor:
         """
@@ -315,8 +324,7 @@ class GAIN(pl.LightningModule):
 
         # Forward Generator
         x_fake, _ = self.generator.forward_g(x=x, input_mask=input_mask_int, time_gap_matrix=time_gap_matrix)
-    
+
         x_fake_denorm = self.normalizer.inverse_transform(x_fake.reshape(-1, self.nodes).detach().cpu())
 
         return x_fake_denorm
-    

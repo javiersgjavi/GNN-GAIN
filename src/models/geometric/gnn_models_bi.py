@@ -97,7 +97,7 @@ class BaseGNN(nn.Module):
         input_tensor_f = torch.stack([x, hint_matrix]).permute(1, 2, 3, 0)
         input_tensor_b = torch.stack([torch.flip(x, dims=[1]), torch.flip(hint_matrix, dims=[1])]).permute(1, 2, 3, 0)
         pred = self.bi_forward(input_tensor_f, input_tensor_b, self.edge_index, self.edge_weights).squeeze(dim=-1)
-        return torch.sigmoid(pred)
+        return pred
 
 
 class STCNBI(BaseGNN):

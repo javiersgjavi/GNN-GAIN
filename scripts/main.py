@@ -1,3 +1,5 @@
+import sys
+sys.path.append('./')
 import os
 import json
 import glob
@@ -84,6 +86,8 @@ def main(args):
         accelerator=accelerator,
         devices=1,
         callbacks=callbacks,
+        #gradient_clip_val=5.,
+        #gradient_clip_algorithm='norm',
     )
 
     trainer.fit(model, datamodule=dm)

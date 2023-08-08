@@ -28,6 +28,7 @@ class RandomSearchLoader:
             'learning_rate': 10 ** uniform(*self.params_grid['log_learning_rate'], size=n_iter),
             'activation': choice(self.params_grid['activation'], size=n_iter),
             'hidden_size': uniform(*self.params_grid['hidden_size'], size=n_iter),
+            'alpha': uniform(*self.params_grid['alpha'], size=n_iter).astype(int),
         }
 
         if self.bi:

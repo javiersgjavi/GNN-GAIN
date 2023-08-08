@@ -89,7 +89,7 @@ class AQICustomSplitter(Splitter):
     def __init__(self, base_data=None, test_months=None, name_time_col=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.base_data = base_data
-        self.test_months = test_months if test_months is not None else [3, 6, 9, 12]
+        self.test_months = test_months if test_months is not None else [6, 9, 12, 3]
 
         self.name_time_col = name_time_col
 
