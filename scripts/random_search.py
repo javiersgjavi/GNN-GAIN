@@ -1,4 +1,5 @@
 import sys
+
 sys.path.append('./')
 import argparse
 import itertools
@@ -13,6 +14,7 @@ def main(args):
     folder = args.folder
     bi = bool(args.bi)
     time_gap = bool(args.time_gap)
+    prop_missing = args.prop_missing
 
     imputation_problem = args.imputation_problem
     scenario = args.scenario
@@ -20,13 +22,17 @@ def main(args):
     if (imputation_problem is not None) and (scenario is not None):
         raise ValueError('Scenario or imputation problem must be specified, not both')
 
+    if imputation_problem is None and scenario is None:
+        folder = f'{folder}_electric'
+        labels = prop_missing.split(',')
+
     elif imputation_problem is not None:
         folder = f'{folder}_point_block'
         labels = imputation_problem.split(',')
         if 'air' in datasets or 'air-36' in datasets:
             raise ValueError('Only la and bay datasets are available for point or block missing experiments')
 
-    else:
+    elif scenario is not None:
         folder = f'{folder}_in_out'
         labels = scenario.split(',')
         if 'la' in datasets or 'bay' in datasets:
@@ -100,6 +106,10 @@ if __name__ == '__main__':
         '--folder',
         help='Path to save the results',
         default='results', )
+    parser.add_argument(
+        '--prop_missing',
+        help='Proportion of missing values to test with electric dataset',
+        default='0.25', )
 
     args = parser.parse_args()
 

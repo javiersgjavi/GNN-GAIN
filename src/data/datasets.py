@@ -160,7 +160,7 @@ class DataModule(pl.LightningModule):
                 time_gap_matrix_f, time_gap_matrix_b = load_time_gap_matrix(base_data, path_time_gap_matrix)
 
         elif dataset.startswith('electric'):
-            prop_missing = float(dataset.split('_')[-2])
+            prop_missing = float(dataset.split('_')[-1])
             base_data = ElectricDataset(prop_missing=prop_missing)
             if self.use_time_gap_matrix:
                 path_time_gap_matrix = f'./data/{dataset}/time_gap_matrix'
