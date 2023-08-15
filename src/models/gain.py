@@ -1,3 +1,5 @@
+import os.path
+
 import torch
 import numpy as np
 import pytorch_lightning as pl
@@ -12,6 +14,8 @@ from src.models.geometric.gnn_models_bi import STCNBI, GRUGCNBI, RNNEncGCNDecBI,
 from src.models.mlp import MLP
 
 from src.utils import loss_d, loss_g, mean_relative_error
+
+import pickle
 
 
 class HintGenerator:
@@ -101,7 +105,7 @@ class GAIN(pl.LightningModule):
         self.loss_mse = torch.nn.MSELoss()
         self.mae = MeanAbsoluteError()
 
-        #edge_weights = torch.where(edge_weights < 0.1, torch.tensor(0, device=edge_index.device), edge_weights)
+        # edge_weights = torch.where(edge_weights < 0.1, torch.tensor(0, device=edge_index.device), edge_weights)
         args = {
             'periods': input_size[0],
             'nodes': self.nodes,
@@ -117,7 +121,8 @@ class GAIN(pl.LightningModule):
         self.generator = model(self.args, time_gap_matrix=self.use_time_gap)
         self.discriminator = model(self.args)
 
-        self.hint_generator = HintGenerator(prop_hint=hint_rate)
+        self.hint_generator = HintGenerator(prop_hint=0.1)
+        # self.hint_generator = HintGenerator(prop_hint=hint_rate)
 
     # -------------------- Custom methods --------------------
 
@@ -306,6 +311,19 @@ class GAIN(pl.LightningModule):
 
         # Calculate the mean squared error (MSE) between the real and imputed data
         self.calculate_error_imputation(outputs, type_step='test')
+
+        #if os.path.exists('outputs_test_h_0.1.pkl'):
+        #    with open('outputs_test_h_0.1.pkl', 'rb') as f:
+        #        outputs_list = pickle.load(f)
+
+
+        #else:
+        #    outputs_list = []
+
+        #outputs_list.append(outputs)
+
+        #with open('outputs_test_h_0.1.pkl', 'wb') as f:
+        #    pickle.dump(outputs_list, f)
 
     def predict_step(self, batch: Tuple, batch_idx: int, dataloader_idx: int = None) -> torch.Tensor:
         """

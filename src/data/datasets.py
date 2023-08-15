@@ -106,7 +106,7 @@ class DataModule(pl.LightningModule):
     """
 
     def __init__(self,
-                 dataset: str = 'credit',
+                 dataset: str = 'la',
                  batch_size: int = 128,
                  val_len: float = 0.2,
                  test_len: float = 0.1,
@@ -203,7 +203,7 @@ class DataModule(pl.LightningModule):
         """
 
         # Split the data into train, validation, and test sets using train_test_split
-        if self.dataset_name.startswith('air'):
+        if self.dataset_name.startswith('air123'):
             if self.dataset_name.endswith('_in'):
 
                 self.splitter = AQICustomInSampleSplitter(
