@@ -180,6 +180,7 @@ class DataModule(pl.LightningModule):
         self.time_gap_matrix_b = time_gap_matrix_b
 
         self.normalizer = MinMaxScaler()
+        print(self.data.shape)
         self.data = pd.DataFrame(self.normalizer.fit_transform(self.data), columns=self.data.columns)
 
         self.splitter = None
@@ -203,7 +204,7 @@ class DataModule(pl.LightningModule):
         """
 
         # Split the data into train, validation, and test sets using train_test_split
-        if self.dataset_name.startswith('air123'):
+        if self.dataset_name.startswith('air'):
             if self.dataset_name.endswith('_in'):
 
                 self.splitter = AQICustomInSampleSplitter(
@@ -234,6 +235,7 @@ class DataModule(pl.LightningModule):
                 known_values=self.known_values,
                 time_gap_matrix_f=self.time_gap_matrix_f,
                 time_gap_matrix_b=self.time_gap_matrix_b,
+                windows_len=36 if self.dataset_name.startswith('air-36') else 24,
             )
 
         train, val, test, shape = self.splitter.split()
@@ -266,11 +268,11 @@ class DataModule(pl.LightningModule):
 
         # Create DataLoader objects for each set
         self.train_loader = DataLoader(data_train, batch_size=self.batch_size, shuffle=True)
-        self.val_loader = DataLoader(data_val, batch_size=self.batch_size, shuffle=False)
-        self.test_loader = DataLoader(data_test, batch_size=self.batch_size, shuffle=False)
+        self.val_loader = DataLoader(data_val, batch_size=self.batch_size, shuffle=True)
+        self.test_loader = DataLoader(data_test, batch_size=self.batch_size, shuffle=True)
 
         self.missing_rate = data_train.get_missing_rate()
-        
+
         print(f'Missing percentaje: {self.missing_rate}')
 
     def input_size(self):
@@ -284,7 +286,7 @@ class DataModule(pl.LightningModule):
 
     def test_dataloader(self):
         return self.test_loader
-    
+
     def predict_dataloader(self):
         return self.test_loader
 
@@ -293,10 +295,11 @@ class DataModule(pl.LightningModule):
 
     def get_normalizer(self):
         return self.normalizer
-    
+
     def get_missing_rate(self):
         return self.missing_rate
-    
+
+
 class VirtualSensingDataModule(DataModule):
     def __init__(self, masked=None, *args, **kwargs):
         super().__init__(*args, **kwargs)

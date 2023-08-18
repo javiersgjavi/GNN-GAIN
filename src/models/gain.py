@@ -13,9 +13,8 @@ from src.models.geometric.gnn_models_bi import STCNBI, GRUGCNBI, RNNEncGCNDecBI,
 
 from src.models.mlp import MLP
 
-from src.utils import loss_d, loss_g, mean_relative_error
+from src.utils import loss_d, loss_g, mean_relative_error, concat_save
 
-import pickle
 
 
 class HintGenerator:
@@ -121,8 +120,9 @@ class GAIN(pl.LightningModule):
         self.generator = model(self.args, time_gap_matrix=self.use_time_gap)
         self.discriminator = model(self.args)
 
-        self.hint_generator = HintGenerator(prop_hint=0.1)
-        # self.hint_generator = HintGenerator(prop_hint=hint_rate)
+        #self.prop_hint = hint_rate
+        self.prop_hint = hint_rate
+        self.hint_generator = HintGenerator(prop_hint=self.prop_hint)
 
     # -------------------- Custom methods --------------------
 
@@ -136,11 +136,12 @@ class GAIN(pl.LightningModule):
                 type_step: A string indicating whether the batch is for training or validation (default is 'train').
             """
         x_real_norm = outputs['x_real']
+        print(x_real_norm.shape)
         x_fake_norm = outputs['x_fake']
         input_mask = outputs['input_mask_bool']
         known_values = outputs['known_values']
 
-        real_values_known = torch.logical_and(~input_mask, known_values)
+        real_values_known = known_values#torch.logical_and(~input_mask, known_values)
 
         fake_norm = x_fake_norm[real_values_known]
         real_norm = x_real_norm[real_values_known]
@@ -157,17 +158,21 @@ class GAIN(pl.LightningModule):
             x_real_denorm = self.normalizer.inverse_transform(x_real_norm.reshape(-1, self.nodes).detach().cpu())
             x_fake_denorm = self.normalizer.inverse_transform(x_fake_norm.reshape(-1, self.nodes).detach().cpu())
 
-            fake_denorm = x_real_denorm[real_values_known.reshape(-1, self.nodes).cpu()]
-            real_denorm = x_fake_denorm[real_values_known.reshape(-1, self.nodes).cpu()]
+            real_denorm = x_real_denorm[real_values_known.reshape(-1, self.nodes).cpu()]
+            fake_denorm = x_fake_denorm[real_values_known.reshape(-1, self.nodes).cpu()]
 
-            mse_denorm = mean_squared_error(fake_denorm, real_denorm)
-            mae_denorm = mean_absolute_error(fake_denorm, real_denorm)
-            mre_denorm = mean_relative_error(fake_denorm, real_denorm)
+            mse_denorm = mean_squared_error(real_denorm, fake_denorm)
+            mae_denorm = mean_absolute_error(real_denorm, fake_denorm)
+            mre_denorm = mean_relative_error(real_denorm, fake_denorm)
 
             self.log('denorm_rmse', np.sqrt(mse_denorm))
             self.log('denorm_mae', mae_denorm)
             self.log('denorm_mse', mse_denorm)
             self.log('denorm_mre', mre_denorm)
+
+            if type_step == 'test':
+                path_save = f'outputs_test_denorm_h_{self.prop_hint}.pkl'
+                concat_save(path_save, {'real': real_denorm, 'fake': fake_denorm})
 
     def loss(self, outputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -312,18 +317,8 @@ class GAIN(pl.LightningModule):
         # Calculate the mean squared error (MSE) between the real and imputed data
         self.calculate_error_imputation(outputs, type_step='test')
 
-        #if os.path.exists('outputs_test_h_0.1.pkl'):
-        #    with open('outputs_test_h_0.1.pkl', 'rb') as f:
-        #        outputs_list = pickle.load(f)
-
-
-        #else:
-        #    outputs_list = []
-
-        #outputs_list.append(outputs)
-
-        #with open('outputs_test_h_0.1.pkl', 'wb') as f:
-        #    pickle.dump(outputs_list, f)
+        path_save = f'outputs_test_h_{self.prop_hint}.pkl'
+        concat_save(path_save, outputs)
 
     def predict_step(self, batch: Tuple, batch_idx: int, dataloader_idx: int = None) -> torch.Tensor:
         """

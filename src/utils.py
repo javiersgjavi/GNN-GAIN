@@ -5,6 +5,7 @@ from torch import nn
 from tqdm import tqdm
 from typing import Tuple
 from tsl.ops.imputation import add_missing_values
+import pickle
 
 
 def init_weights_xavier(m: nn.Module) -> None:
@@ -62,7 +63,7 @@ def create_windows_from_sequence(data, mask, known_values, time_gap_matrix_f, ti
     return res
 
 
-def generate_uniform_noise(tensor_like, low=0, high=0.01):
+def generate_uniform_noise(tensor_like, low=0, high=0.1):
     return torch.distributions.uniform.Uniform(low, high).sample(tensor_like.shape).to(tensor_like.device)
 
 
@@ -144,3 +145,15 @@ def loss_g(d_prob: torch.Tensor, m: torch.Tensor) -> torch.Tensor:
         torch.Tensor: Generator loss
     """
     return -torch.mean((1 - m) * torch.log(d_prob + 1e-8))
+
+def concat_save(path_save, outputs):
+        if os.path.exists(path_save):
+            with open(path_save, 'rb') as f:
+                outputs_list = pickle.load(f)
+        else:
+            outputs_list = []
+
+        outputs_list.append(outputs)
+
+        with open(path_save, 'wb') as f:
+            pickle.dump(outputs_list, f)
