@@ -132,13 +132,10 @@ class GAIN(pl.LightningModule):
             """
         x_real_norm = outputs['x_real']
         x_fake_norm = outputs['x_fake']
-        input_mask = outputs['input_mask_bool']
         known_values = outputs['known_values']
 
-        real_values_known = torch.logical_and(~input_mask, known_values)
-
-        fake_norm = x_fake_norm[real_values_known]
-        real_norm = x_real_norm[real_values_known]
+        real_norm = x_real_norm[known_values]
+        fake_norm = x_fake_norm[known_values]
 
         mse_norm = self.loss_mse(fake_norm, real_norm)
         mae_norm = self.mae(fake_norm, real_norm)
@@ -152,12 +149,13 @@ class GAIN(pl.LightningModule):
             x_real_denorm = self.normalizer.inverse_transform(x_real_norm.reshape(-1, self.nodes).detach().cpu())
             x_fake_denorm = self.normalizer.inverse_transform(x_fake_norm.reshape(-1, self.nodes).detach().cpu())
 
-            fake_denorm = x_real_denorm[real_values_known.reshape(-1, self.nodes).cpu()]
-            real_denorm = x_fake_denorm[real_values_known.reshape(-1, self.nodes).cpu()]
+            real_denorm= x_real_denorm[known_values.reshape(-1, self.nodes).cpu()]
+            fake_denorm = x_fake_denorm[known_values.reshape(-1, self.nodes).cpu()]
 
-            mse_denorm = mean_squared_error(fake_denorm, real_denorm)
-            mae_denorm = mean_absolute_error(fake_denorm, real_denorm)
-            mre_denorm = mean_relative_error(fake_denorm, real_denorm)
+            mse_denorm = mean_squared_error(real_denorm, fake_denorm)
+            mae_denorm = mean_absolute_error(real_denorm, fake_denorm)
+            mre_denorm = mean_relative_error(real_denorm, fake_denorm)
+
 
             self.log('denorm_rmse', np.sqrt(mse_denorm))
             self.log('denorm_mae', mae_denorm)
