@@ -55,7 +55,8 @@ class HintGenerator:
 
 class GAIN(pl.LightningModule):
     def __init__(self, input_size: tuple, edge_index, edge_weights, normalizer, model_type: str = None,
-                 hint_rate: float = 0.9, alpha: float = 100, params: Dict = None):
+                 hint_rate: float = 0.9, alpha: float = 100, params: Dict = None,
+                 ablation_gan=False, ablation_reconstruction=False):
         """
         A PyTorch Lightning module implementing the GAIN (Generative Adversarial Imputation Network) algorithm.
 
@@ -118,6 +119,9 @@ class GAIN(pl.LightningModule):
         self.discriminator = model(self.args)
 
         self.hint_generator = HintGenerator(prop_hint=hint_rate)
+
+        self.ablation_gan = ablation_gan
+        self.ablation_reconstruction = ablation_reconstruction
 
     # -------------------- Custom methods --------------------
 
@@ -184,11 +188,13 @@ class GAIN(pl.LightningModule):
         d_loss = loss_d(d_pred, input_mask_int)
 
         # --------------------- Generator loss -------------------------
-        g_loss_adversarial = loss_g(d_pred, input_mask_int)
+        g_loss_adversarial = loss_g(d_pred, input_mask_int) if not self.ablation_gan else torch.zeros(1, device=d_pred.device, requires_grad=True)
 
-        g_loss_reconstruction = self.loss_mse(imputation[input_mask_bool], x_real[input_mask_bool])
+        g_loss_reconstruction = self.loss_mse(imputation[input_mask_bool], x_real[input_mask_bool]) if not self.ablation_reconstruction else torch.zeros(1, device=d_pred.device, requires_grad=True)
 
         g_loss = g_loss_adversarial + self.alpha * g_loss_reconstruction
+
+
         # ---------------------------------------------------------------
 
         log_dict = {'Generator': g_loss_adversarial, 'Discriminator': d_loss}

@@ -179,6 +179,35 @@ class ExperimentAblation(Experiment):
 
         return dm, edge_index, edge_weights, normalizer
 
+    def train_test(self, hyperparameters):
+        self.model = GAIN(
+            model_type=self.model_name,
+            input_size=self.dm.input_size(),
+            edge_index=self.edge_index,
+            edge_weights=self.edge_weights,
+            normalizer=self.normalizer,
+            params=hyperparameters,
+            alpha=hyperparameters['alpha'] if 'alpha' in hyperparameters.keys() else None,
+            ablation_gan = True if self.ablation == 'no_gan' else False,
+            ablation_reconstruction = True if self.ablation == 'no_reconstruction' else False
+        )
+
+        early_stopping = EarlyStopping(monitor='denorm_mse', patience=1, mode='min')
+        self.trainer = Trainer(
+            max_steps=self.max_iter_train,
+            default_root_dir='reports/logs_experiments',
+            accelerator=self.accelerator,
+            devices=self.selected_gpu,
+            gradient_clip_val=5.,
+            gradient_clip_algorithm='norm',
+            callbacks=[early_stopping],
+        )
+
+        self.trainer.fit(self.model, datamodule=self.dm)
+
+        results = self.trainer.test(self.model, datamodule=self.dm)[0]
+        return results
+
 
 class VirtualSensingExperiment(Experiment):
     def __init__(self, masked=None, *args, **kwargs):

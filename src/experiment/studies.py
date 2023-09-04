@@ -106,7 +106,7 @@ class AblationStudy(AverageResults):
             dataset = row['dataset']
             hyperparameters = row['params']
 
-            for ablation in ['no_bi', 'no_tg', 'no_bi_no_tg','fc', 'nc']:
+            for ablation in ['no_gan', 'no_reconstruction', 'no_bi', 'no_tg', 'no_bi_no_tg','fc', 'nc']:
                 experiment = ExperimentAblation(
                     model=model,
                     dataset=dataset,
