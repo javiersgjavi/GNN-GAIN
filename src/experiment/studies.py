@@ -98,6 +98,36 @@ class AblationStudy(AverageResults):
 
         return original_row, name_dataset
 
+    def make_table_ab(self, name_table, suffix_exp, datasets, problems):
+
+        df = pd.read_csv(f'{self.folder}/results.csv', index_col='dataset')
+        ab_table = pd.DataFrame(columns = df.columns)
+
+        for problem, dataset in itertools.product(problems, datasets):
+            family_exp = f'{dataset}_{problem}_'
+            for row in df.index:
+                    if family_exp in row and row.split(family_exp)[1] in suffix_exp:
+                        #print(row)
+                        ab_table.loc[row] = df.loc[row]
+
+        ab_table.to_csv(f'{self.folder}/results_{name_table}.csv')
+
+    def make_tables_ab(self):
+        df = pd.read_csv(f'{self.folder}/results.csv', index_col='dataset')
+
+        datasets = np.unique([row.split('_')[0] for row in df.index])
+        problems = np.unique([row.split('_')[1] for row in df.index])
+
+        tables_to_make ={
+            'arch': ['no_bi', 'no_tg', 'no_bi_no_tg'],
+            'graph': ['fc', 'nc'],
+            'loss': ['no_gan', 'no_reconstruction']
+        }
+
+        for table_name in tables_to_make.keys():
+            self.make_table_ab(table_name, tables_to_make[table_name], datasets, problems)
+        
+
     def run(self):
         results_path = f'./{self.folder}'
         for i in range(len(self.input_file)):
@@ -121,7 +151,9 @@ class AblationStudy(AverageResults):
                 )
                 experiment.run()
 
-        self.make_summary_dataset()        
+        self.make_summary_dataset() 
+        self.make_tables_ab()
+       
           
 class VirtualSensingStudy(AverageResults):
     def __init__(self, masked=None, dataset=None, *args, **kwargs):
@@ -161,6 +193,8 @@ class VirtualSensingStudy(AverageResults):
             mean = np.mean(mae_dict[column])
             std = np.std(mae_dict[column])
             df.loc[i] = [column, mean, std]
+            print(column, mean, std)
+            print(mae_dict[column])
         df.to_csv(f'{self.folder}/results.csv')
 
     def obtain_virtual_sensing_errors(self, predictions, model, dm_v):
@@ -231,6 +265,7 @@ class MissingDataSensitivityStudy(AverageResults):
     
         self.make_summary_dataset(model) 
         self.create_plot()
+        self.create_plot_top()
 
     def create_plot(self):
         df = pd.read_csv(f'{self.folder}/results.csv')
@@ -246,3 +281,28 @@ class MissingDataSensitivityStudy(AverageResults):
         plt.xlabel('Missing percentage')
         plt.ylabel('MAE')
         plt.savefig(f'{self.folder}/sensitivity_analysis.png', dpi=300)
+
+
+    def create_plot_top(self):
+
+        df = pd.read_csv(f'{self.folder}/results.csv')
+        best_results = []
+        for file in np.sort(os.listdir(self.folder)):
+            if file.endswith('.csv') and not file == 'results.csv':
+                print(file)
+                data_file = pd.read_csv(f'{self.folder}/{file}')
+                best_results.append(data_file['denorm_mae'].min())
+
+        res = pd.DataFrame(columns = ['model']+[i for i in range(10, 100, 10)]).set_index('model')
+        res.loc['TG-GAIN'] = best_results
+        res.loc['GRIN'] = [1.87, 1.9, 1.94, 1.98, 2.04, 2.11, 2.22, 2.40, 2.84]
+        res.loc['BRITS'] = [2.32, 2.34, 2.36, 2.40, 2.47, 2.57, 2.76, 3.08, 4.02]
+
+        sns.set_theme()
+        plt.figure()
+        sns.lineplot(x=res.columns, y=res.loc['TG-GAIN'], label='TG-GAIN')
+        sns.lineplot(x=res.columns, y=res.loc['GRIN'], label='GRIN')
+        sns.lineplot(x=res.columns, y=res.loc['BRITS'], label='BRITS')
+        plt.xlabel('Missing percentage')
+        plt.ylabel('MAE')
+        plt.savefig(f'{self.folder}/sensitivity_analysis_top.png', dpi=300)
