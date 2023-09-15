@@ -185,7 +185,7 @@ class GAIN(pl.LightningModule):
         input_mask_bool = outputs['input_mask_bool']
 
         # --------------------- Discriminator loss ---------------------
-        d_loss = loss_d(d_pred, input_mask_int)
+        d_loss = loss_d(d_pred, input_mask_int) if not self.ablation_gan else torch.zeros(1, device=d_pred.device, requires_grad=True)
 
         # --------------------- Generator loss -------------------------
         g_loss_adversarial = loss_g(d_pred, input_mask_int) if not self.ablation_gan else torch.zeros(1, device=d_pred.device, requires_grad=True)
@@ -237,6 +237,36 @@ class GAIN(pl.LightningModule):
             'known_values': known_values
         }
         return res
+    
+    def multiple_imputation(self, batch):
+        outputs = self.return_gan_outputs(batch)
+
+        x_real = outputs['x_real']
+        x_fake = outputs['x_fake']
+        input_mask_bool = outputs['input_mask_bool']
+
+        d_pred_list = [outputs['d_pred']]
+        imputation_list = [outputs['imputation']]
+
+        for _ in range(9):
+            outputs = self.return_gan_outputs(batch)
+            d_pred_list.append(outputs['d_pred'])
+            imputation_list.append(outputs['imputation'])
+
+        d_pred_stacked = torch.stack(d_pred_list)
+        imputation_stacked = torch.stack(imputation_list)
+
+        indices = d_pred_stacked.argmax(dim=0)
+
+        imputation = torch.gather(imputation_stacked, 0, indices.unsqueeze(0))[0]
+
+        x_fake = torch.where(input_mask_bool, x_real, imputation)
+
+        outputs['x_fake'] = x_fake
+        outputs['imputation'] = imputation
+
+        return outputs
+
 
     # -------------------- Methods from PyTorch Lightning --------------------
 
@@ -306,7 +336,7 @@ class GAIN(pl.LightningModule):
         """
 
         # Generate GAN outputs for the given batch
-        outputs = self.return_gan_outputs(batch)
+        outputs = self.multiple_imputation(batch)
 
         # Calculate the mean squared error (MSE) between the real and imputed data
         self.calculate_error_imputation(outputs, type_step='test')
