@@ -119,7 +119,7 @@ class AblationStudy(AverageResults):
         problems = np.unique([row.split('_')[1] for row in df.index])
 
         tables_to_make ={
-            'arch': ['no_bi', 'no_tg', 'no_bi_no_tg'],
+            'arch': ['no_bi', 'no_tg', 'no_bi_no_tg', 'no_loop', 'no_loop_no_bi'],
             'graph': ['fc', 'nc'],
             'loss': ['no_gan', 'no_reconstruction']
         }
@@ -136,7 +136,7 @@ class AblationStudy(AverageResults):
             dataset = row['dataset']
             hyperparameters = row['params']
 
-            for ablation in ['no_gan', 'no_reconstruction', 'no_bi', 'no_tg', 'no_bi_no_tg','fc', 'nc']:
+            for ablation in ['no_gan', 'no_reconstruction', 'no_bi', 'no_tg', 'no_loop', 'no_loop_no_bi', 'no_bi_no_tg','fc', 'nc']:
                 experiment = ExperimentAblation(
                     model=model,
                     dataset=dataset,

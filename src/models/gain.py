@@ -56,7 +56,7 @@ class HintGenerator:
 class GAIN(pl.LightningModule):
     def __init__(self, input_size: tuple, edge_index, edge_weights, normalizer, model_type: str = None,
                  hint_rate: float = 0.9, alpha: float = 100, params: Dict = None,
-                 ablation_gan=False, ablation_reconstruction=False):
+                 ablation_gan=False, ablation_reconstruction=False, ablation_loop=False):
         """
         A PyTorch Lightning module implementing the GAIN (Generative Adversarial Imputation Network) algorithm.
 
@@ -122,6 +122,7 @@ class GAIN(pl.LightningModule):
 
         self.ablation_gan = ablation_gan
         self.ablation_reconstruction = ablation_reconstruction
+        self.ablation_loop = ablation_loop
 
     # -------------------- Custom methods --------------------
 
@@ -335,8 +336,9 @@ class GAIN(pl.LightningModule):
             batch_idx (int): Index of the current batch.
         """
 
+
         # Generate GAN outputs for the given batch
-        outputs = self.multiple_imputation(batch)
+        outputs = self.multiple_imputation(batch) if not self.ablation_loop else self.return_gan_outputs(batch)
 
         # Calculate the mean squared error (MSE) between the real and imputed data
         self.calculate_error_imputation(outputs, type_step='test')

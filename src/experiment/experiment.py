@@ -189,7 +189,8 @@ class ExperimentAblation(Experiment):
             params=hyperparameters,
             alpha=hyperparameters['alpha'] if 'alpha' in hyperparameters.keys() else None,
             ablation_gan = True if self.ablation == 'no_gan' else False,
-            ablation_reconstruction = True if self.ablation == 'no_reconstruction' else False
+            ablation_reconstruction = True if self.ablation == 'no_reconstruction' else False,
+            ablation_loop = True if 'no_loop' in self.ablation else False
         )
 
         early_stopping = EarlyStopping(monitor='denorm_mse', patience=1, mode='min')
