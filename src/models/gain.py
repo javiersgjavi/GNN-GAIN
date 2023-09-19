@@ -367,18 +367,25 @@ class GAIN(pl.LightningModule):
 
 
 class GAIN_DYNAMIC(GAIN):
+    def __init__(self, *args, **kwargs):
+        self.missing_threshold = None
+        super().__init__(*args, **kwargs)
+
+    def set_threshold(self, missing_threshold):
+        self.missing_threshold = missing_threshold
+
     def dynamic_mask_data(self, batch):
         x, x_real, input_mask_bool, input_mask_int, known_values, time_gap_matrix = batch
 
-        generated_mask = torch.rand(x.shape, device=x.device) < 0.5
-        input_mask_bool[generated_mask] = False
-        input_mask_int[generated_mask] = 0
-        x[generated_mask] = 0
-        known_values[generated_mask] = 0
+        generated_mask = torch.rand(input_mask_bool.shape, device=input_mask_bool.device) < self.missing_threshold
 
-        print(torch.sum(input_mask_bool)/(torch.flatten(x).shape[0]))
+        new_x = torch.where(generated_mask, torch.tensor(0, device=input_mask_bool.device), x)
+        new_input_mask_bool = torch.where(generated_mask, torch.tensor(False, device=input_mask_bool.device), input_mask_bool)
+        new_input_mask_int = torch.where(generated_mask, torch.tensor(0, device=input_mask_int.device), input_mask_bool)
 
-        new_batch = x, x_real, input_mask_bool, input_mask_int, known_values, time_gap_matrix
+        new_batch = new_x, x_real, new_input_mask_bool, new_input_mask_int, known_values, time_gap_matrix
+
+        #print(torch.sum(new_input_mask_bool)/(new_input_mask_bool.shape[0]*new_input_mask_bool.shape[1]*new_input_mask_bool.shape[2]))
         return new_batch
 
     def training_step(self, batch: Tuple, batch_idx: int, optimizer_idx: int) -> torch.Tensor:
@@ -395,23 +402,10 @@ class GAIN_DYNAMIC(GAIN):
         """
 
         # Dynamic generate mask out
-        print('1')
         new_batch = self.dynamic_mask_data(batch)
 
-        print('2')
-        # Generate GAN outputs for the given batch
-        outputs = self.return_gan_outputs(new_batch)
+        return super().training_step(new_batch, batch_idx, optimizer_idx)
 
-        print('3')
-        # Compute the discriminator and generator loss based on the generated outputs
-        d_loss, g_loss = self.loss(outputs)
-
-        print('4')
-        # Calculate the mean squared error (MSE) between the real and imputed data
-        self.calculate_error_imputation(outputs)
-
-        print('5')
-        # Select the appropriate loss based on the optimizer index
-        loss = d_loss if optimizer_idx == 0 else g_loss
-
-        return loss
+    def test_step(self, batch: Tuple, batch_idx: int) -> None:
+        new_batch = self.dynamic_mask_data(batch)
+        return super().test_step(new_batch, batch_idx)

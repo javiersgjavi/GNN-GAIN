@@ -107,7 +107,6 @@ class AblationStudy(AverageResults):
             family_exp = f'{dataset}_{problem}_'
             for row in df.index:
                     if family_exp in row and row.split(family_exp)[1] in suffix_exp:
-                        #print(row)
                         ab_table.loc[row] = df.loc[row]
 
         ab_table.to_csv(f'{self.folder}/results_{name_table}.csv')
@@ -236,10 +235,11 @@ class VirtualSensingStudy(AverageResults):
     
       
 class MissingDataSensitivityStudy(AverageResults):
-    def __init__(self, dataset_name=None, p_noises=None, *args, **kwargs):
+    def __init__(self, dataset_name=None, p_noise=None, thresholds=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.thresholds = thresholds
         self.dataset_name = dataset_name
-        self.p_noises = p_noises
+        self.p_noise = p_noise
 
     def run(self):
         results_path = f'./{self.folder}'
@@ -257,12 +257,14 @@ class MissingDataSensitivityStudy(AverageResults):
             max_iter_train=self.max_iter_train,
             default_hyperparameters=hyperparameters,
             save_file=self.dataset_name,
-            base_noise=self.p_noises[5]
+            base_noise=self.p_noise,
+            trainning_threshold=self.thresholds[5]
         )
         experiment.train_model()
 
-        for p_noise in self.p_noises:
-            experiment.run_test(p_noise)
+        for i, p_noise in enumerate(self.thresholds):
+            percentage = (i+1)*10
+            experiment.run_test(percentage, p_noise)
 
         self.make_summary_dataset(model) 
         self.create_plot()

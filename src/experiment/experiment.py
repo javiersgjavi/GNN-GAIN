@@ -244,16 +244,16 @@ class VirtualSensingExperiment(Experiment):
 
 
 class MissingDataSensitivityExperiment(Experiment):
-    def __init__(self, base_noise, *args, **kwargs):
+    def __init__(self, base_noise, trainning_threshold, *args, **kwargs):
         self.base_noise = base_noise
+        self.trainning_threshold = trainning_threshold
         super().__init__(*args, **kwargs)
         self.exp_name = 'Missing data sensitivity experiment'
 
-    def prepare_data(self, p_noise=None):
-        p_noise = p_noise if p_noise is not None else self.base_noise
+    def prepare_data(self):
 
         dm = DataModule(dataset=self.dataset, batch_size=self.batch_size, use_time_gap_matrix=self.time_gap,
-                        p_noise=p_noise)
+                        p_noise=self.base_noise)
         edge_index, edge_weights = dm.get_connectivity()
         normalizer = dm.get_normalizer()
         dm.setup()
@@ -261,15 +261,6 @@ class MissingDataSensitivityExperiment(Experiment):
         if self.accelerator == 'gpu':
             edge_index = torch.from_numpy(edge_index).to(f'cuda:{self.selected_gpu[0]}')
             edge_weights = torch.from_numpy(edge_weights).to(f'cuda:{self.selected_gpu[0]}')
-
-        percentage = dm.get_missing_rate()
-
-        if self.save_file.endswith('0.csv'):
-            self.save_file = self.save_file.replace(self.save_file[-7:], f'_{int(round(percentage, -1))}.csv')
-        else:
-            self.save_file = self.save_file.replace('.csv', f'_{int(round(percentage, -1))}.csv')
-
-        self.results_file = self.load_file()
 
         return dm, edge_index, edge_weights, normalizer
     
@@ -280,7 +271,7 @@ class MissingDataSensitivityExperiment(Experiment):
         best_denorm_mae = 100000
         results_candidates = []
         for i in tqdm(range(5)):
-            self.model = GAIN(
+            self.model = GAIN_DYNAMIC(
                 model_type=self.model_name,
                 input_size=self.dm.input_size(),
                 edge_index=self.edge_index,
@@ -289,6 +280,8 @@ class MissingDataSensitivityExperiment(Experiment):
                 params=self.default_hyperparameters,
                 alpha=self.default_hyperparameters['alpha'] if 'alpha' in self.default_hyperparameters.keys() else None,
             )
+
+            self.model.set_threshold(self.trainning_threshold)
 
             early_stopping = EarlyStopping(monitor='denorm_mse', patience=1, mode='min')
             self.trainer = Trainer(
@@ -316,16 +309,20 @@ class MissingDataSensitivityExperiment(Experiment):
         print(f'[INFO] error model selected in mae: {results_candidates[best_candidate]}')
 
 
-    def run_test(self, p_noise):
-        dm, _, _, _ = self.prepare_data(p_noise)
+    def run_test(self, percentage, threshold):
+        if self.save_file.endswith('0.csv'):
+            self.save_file = self.save_file.replace(self.save_file[-7:], f'_{int(round(percentage, -1))}.csv')
+        else:
+            self.save_file = self.save_file.replace('.csv', f'_{int(round(percentage, -1))}.csv')
+
+        self.results_file = self.load_file()
+
+        self.model.set_threshold(threshold)
 
         for _ in tqdm(range(self.results_file.shape[0], self.iterations),
                       desc=f'{self.exp_name} with {self.model_name} in {self.dataset}'):
-            results = self.trainer.test(self.model, datamodule=dm)[0]
+            results = self.trainer.test(self.model, datamodule=self.dm)[0]
             self.save_results_file(results, self.default_hyperparameters)
-
-
-
 
 class RandomSearchExperiment(Experiment):
     def __init__(self, bi=False, param_loader=None, *args, **kwargs):
