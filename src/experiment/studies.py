@@ -248,21 +248,22 @@ class MissingDataSensitivityStudy(AverageResults):
         model = row['model'].values[0]
         hyperparameters = row['params'].values[0]
 
-        for p_noise in self.p_noises:
-            experiment = MissingDataSensitivityExperiment(
-                model=model,
-                dataset=self.dataset_name,
-                iterations=self.iterations,
-                results_path=results_path,
-                gpu=self.gpu,
-                max_iter_train=self.max_iter_train,
-                default_hyperparameters=hyperparameters,
-                save_file=self.dataset_name,
-                p_noise=p_noise
-            )
-            experiment.run()
+        experiment = MissingDataSensitivityExperiment(
+            model=model,
+            dataset=self.dataset_name,
+            iterations=self.iterations,
+            results_path=results_path,
+            gpu=self.gpu,
+            max_iter_train=self.max_iter_train,
+            default_hyperparameters=hyperparameters,
+            save_file=self.dataset_name,
+            base_noise=self.p_noises[5]
+        )
+        experiment.train_model()
 
-    
+        for p_noise in self.p_noises:
+            experiment.run_test(p_noise)
+
         self.make_summary_dataset(model) 
         self.create_plot()
         self.create_plot_top()

@@ -220,7 +220,7 @@ class GAIN(pl.LightningModule):
 
         # Forward Generator
         x_fake, imputation = self.generator.forward_g(x=x, input_mask=input_mask_int,
-                                                      time_gap_matrix=time_gap_matrix)  # tengo que recibir las dos
+                                                      time_gap_matrix=time_gap_matrix)
 
         # Generate Hint Matrix
         hint_matrix = self.hint_generator.generate(input_mask_int)
@@ -364,3 +364,54 @@ class GAIN(pl.LightningModule):
         x_fake_denorm = self.normalizer.inverse_transform(x_fake.reshape(-1, self.nodes).detach().cpu())
 
         return x_fake_denorm
+
+
+class GAIN_DYNAMIC(GAIN):
+    def dynamic_mask_data(self, batch):
+        x, x_real, input_mask_bool, input_mask_int, known_values, time_gap_matrix = batch
+
+        generated_mask = torch.rand(x.shape, device=x.device) < 0.5
+        input_mask_bool[generated_mask] = False
+        input_mask_int[generated_mask] = 0
+        x[generated_mask] = 0
+        known_values[generated_mask] = 0
+
+        print(torch.sum(input_mask_bool)/(torch.flatten(x).shape[0]))
+
+        new_batch = x, x_real, input_mask_bool, input_mask_int, known_values, time_gap_matrix
+        return new_batch
+
+    def training_step(self, batch: Tuple, batch_idx: int, optimizer_idx: int) -> torch.Tensor:
+        """
+        Runs a single training step on a batch of data.
+
+        Args:
+            batch (Tuple): Tuple of input data, `x_real`, `x`, and `input_mask`.
+            batch_idx (int): Index of the current batch.
+            optimizer_idx (int): Index of the optimizer to use for this step.
+
+        Returns:
+            Any: The computed loss for the current step.
+        """
+
+        # Dynamic generate mask out
+        print('1')
+        new_batch = self.dynamic_mask_data(batch)
+
+        print('2')
+        # Generate GAN outputs for the given batch
+        outputs = self.return_gan_outputs(new_batch)
+
+        print('3')
+        # Compute the discriminator and generator loss based on the generated outputs
+        d_loss, g_loss = self.loss(outputs)
+
+        print('4')
+        # Calculate the mean squared error (MSE) between the real and imputed data
+        self.calculate_error_imputation(outputs)
+
+        print('5')
+        # Select the appropriate loss based on the optimizer index
+        loss = d_loss if optimizer_idx == 0 else g_loss
+
+        return loss

@@ -135,7 +135,6 @@ class DataModule(pl.LightningModule):
                                            min_seq=12,
                                            max_seq=12 * 4,
                                            seed=9101112)
-
             if self.use_time_gap_matrix:
                 path_time_gap_matrix = f'./data/{dataset}/time_gap_matrix_{p_fault}_{p_noise}_{9101112}'
                 time_gap_matrix_f, time_gap_matrix_b = load_time_gap_matrix(base_data, path_time_gap_matrix)
