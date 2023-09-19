@@ -56,7 +56,7 @@ class HintGenerator:
 class GAIN(pl.LightningModule):
     def __init__(self, input_size: tuple, edge_index, edge_weights, normalizer, model_type: str = None,
                  hint_rate: float = 0.9, alpha: float = 100, params: Dict = None,
-                 ablation_gan=False, ablation_reconstruction=False):
+                 ablation_gan=False, ablation_reconstruction=False, ablation_loop=False):
         """
         A PyTorch Lightning module implementing the GAIN (Generative Adversarial Imputation Network) algorithm.
 
@@ -122,6 +122,7 @@ class GAIN(pl.LightningModule):
 
         self.ablation_gan = ablation_gan
         self.ablation_reconstruction = ablation_reconstruction
+        self.ablation_loop = ablation_loop
 
     # -------------------- Custom methods --------------------
 
@@ -219,7 +220,7 @@ class GAIN(pl.LightningModule):
 
         # Forward Generator
         x_fake, imputation = self.generator.forward_g(x=x, input_mask=input_mask_int,
-                                                      time_gap_matrix=time_gap_matrix)  # tengo que recibir las dos
+                                                      time_gap_matrix=time_gap_matrix)
 
         # Generate Hint Matrix
         hint_matrix = self.hint_generator.generate(input_mask_int)
@@ -335,8 +336,9 @@ class GAIN(pl.LightningModule):
             batch_idx (int): Index of the current batch.
         """
 
+
         # Generate GAN outputs for the given batch
-        outputs = self.multiple_imputation(batch)
+        outputs = self.multiple_imputation(batch) if not self.ablation_loop else self.return_gan_outputs(batch)
 
         # Calculate the mean squared error (MSE) between the real and imputed data
         self.calculate_error_imputation(outputs, type_step='test')
@@ -362,3 +364,48 @@ class GAIN(pl.LightningModule):
         x_fake_denorm = self.normalizer.inverse_transform(x_fake.reshape(-1, self.nodes).detach().cpu())
 
         return x_fake_denorm
+
+
+class GAIN_DYNAMIC(GAIN):
+    def __init__(self, *args, **kwargs):
+        self.missing_threshold = None
+        super().__init__(*args, **kwargs)
+
+    def set_threshold(self, missing_threshold):
+        self.missing_threshold = missing_threshold
+
+    def dynamic_mask_data(self, batch):
+        x, x_real, input_mask_bool, input_mask_int, known_values, time_gap_matrix = batch
+
+        generated_mask = torch.rand(input_mask_bool.shape, device=input_mask_bool.device) < self.missing_threshold
+
+        new_x = torch.where(generated_mask, torch.tensor(0, device=input_mask_bool.device), x)
+        new_input_mask_bool = torch.where(generated_mask, torch.tensor(False, device=input_mask_bool.device), input_mask_bool)
+        new_input_mask_int = torch.where(generated_mask, torch.tensor(0, device=input_mask_int.device), input_mask_bool)
+
+        new_batch = new_x, x_real, new_input_mask_bool, new_input_mask_int, known_values, time_gap_matrix
+
+        #print(torch.sum(new_input_mask_bool)/(new_input_mask_bool.shape[0]*new_input_mask_bool.shape[1]*new_input_mask_bool.shape[2]))
+        return new_batch
+
+    def training_step(self, batch: Tuple, batch_idx: int, optimizer_idx: int) -> torch.Tensor:
+        """
+        Runs a single training step on a batch of data.
+
+        Args:
+            batch (Tuple): Tuple of input data, `x_real`, `x`, and `input_mask`.
+            batch_idx (int): Index of the current batch.
+            optimizer_idx (int): Index of the optimizer to use for this step.
+
+        Returns:
+            Any: The computed loss for the current step.
+        """
+
+        # Dynamic generate mask out
+        new_batch = self.dynamic_mask_data(batch)
+
+        return super().training_step(new_batch, batch_idx, optimizer_idx)
+
+    def test_step(self, batch: Tuple, batch_idx: int) -> None:
+        new_batch = self.dynamic_mask_data(batch)
+        return super().test_step(new_batch, batch_idx)

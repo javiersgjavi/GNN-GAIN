@@ -14,7 +14,8 @@ def main(args):
     folder = f'results/missing_{dataset}_{name_input_file}'
 
     if dataset == 'la_point':
-        p_noises = [0.021, 0.134, 0.23, 0.348, 0.457, 0.565, 0.674, 0.783, 0.893]
+        thresholds = [0.02, 0.12, 0.23, 0.34, 0.44, 0.56, 0.66, 0.78, 0.89]
+        start_p_noises = 0.001
 
     random_search = MissingDataSensitivityStudy(
         dataset_name=dataset,
@@ -23,7 +24,8 @@ def main(args):
         max_iter_train=5000,
         folder=folder,
         input_file=input_file,
-        p_noises=p_noises
+        p_noise=start_p_noises,
+        thresholds=thresholds,
     )
 
     random_search.run()

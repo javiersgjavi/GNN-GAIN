@@ -107,7 +107,6 @@ class AblationStudy(AverageResults):
             family_exp = f'{dataset}_{problem}_'
             for row in df.index:
                     if family_exp in row and row.split(family_exp)[1] in suffix_exp:
-                        #print(row)
                         ab_table.loc[row] = df.loc[row]
 
         ab_table.to_csv(f'{self.folder}/results_{name_table}.csv')
@@ -119,7 +118,7 @@ class AblationStudy(AverageResults):
         problems = np.unique([row.split('_')[1] for row in df.index])
 
         tables_to_make ={
-            'arch': ['no_bi', 'no_tg', 'no_bi_no_tg'],
+            'arch': ['no_bi', 'no_tg', 'no_bi_no_tg', 'no_loop', 'no_loop_no_bi'],
             'graph': ['fc', 'nc'],
             'loss': ['no_gan', 'no_reconstruction']
         }
@@ -136,7 +135,7 @@ class AblationStudy(AverageResults):
             dataset = row['dataset']
             hyperparameters = row['params']
 
-            for ablation in ['no_gan', 'no_reconstruction', 'no_bi', 'no_tg', 'no_bi_no_tg','fc', 'nc']:
+            for ablation in ['no_gan', 'no_reconstruction', 'no_bi', 'no_tg', 'no_loop', 'no_loop_no_bi', 'no_bi_no_tg','fc', 'nc']:
                 experiment = ExperimentAblation(
                     model=model,
                     dataset=dataset,
@@ -236,10 +235,11 @@ class VirtualSensingStudy(AverageResults):
     
       
 class MissingDataSensitivityStudy(AverageResults):
-    def __init__(self, dataset_name=None, p_noises=None, *args, **kwargs):
+    def __init__(self, dataset_name=None, p_noise=None, thresholds=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.thresholds = thresholds
         self.dataset_name = dataset_name
-        self.p_noises = p_noises
+        self.p_noise = p_noise
 
     def run(self):
         results_path = f'./{self.folder}'
@@ -248,21 +248,24 @@ class MissingDataSensitivityStudy(AverageResults):
         model = row['model'].values[0]
         hyperparameters = row['params'].values[0]
 
-        for p_noise in self.p_noises:
-            experiment = MissingDataSensitivityExperiment(
-                model=model,
-                dataset=self.dataset_name,
-                iterations=self.iterations,
-                results_path=results_path,
-                gpu=self.gpu,
-                max_iter_train=self.max_iter_train,
-                default_hyperparameters=hyperparameters,
-                save_file=self.dataset_name,
-                p_noise=p_noise
-            )
-            experiment.run()
+        experiment = MissingDataSensitivityExperiment(
+            model=model,
+            dataset=self.dataset_name,
+            iterations=self.iterations,
+            results_path=results_path,
+            gpu=self.gpu,
+            max_iter_train=self.max_iter_train,
+            default_hyperparameters=hyperparameters,
+            save_file=self.dataset_name,
+            base_noise=self.p_noise,
+            trainning_threshold=self.thresholds[5]
+        )
+        experiment.train_model()
 
-    
+        for i, p_noise in enumerate(self.thresholds):
+            percentage = (i+1)*10
+            experiment.run_test(percentage, p_noise)
+
         self.make_summary_dataset(model) 
         self.create_plot()
         self.create_plot_top()

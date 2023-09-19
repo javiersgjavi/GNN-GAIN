@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from src.models.gain import GAIN
+from src.models.gain import GAIN, GAIN_DYNAMIC
 from src.data.datasets import DataModule, VirtualSensingDataModule
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
@@ -189,7 +189,8 @@ class ExperimentAblation(Experiment):
             params=hyperparameters,
             alpha=hyperparameters['alpha'] if 'alpha' in hyperparameters.keys() else None,
             ablation_gan = True if self.ablation == 'no_gan' else False,
-            ablation_reconstruction = True if self.ablation == 'no_reconstruction' else False
+            ablation_reconstruction = True if self.ablation == 'no_reconstruction' else False,
+            ablation_loop = True if 'no_loop' in self.ablation else False
         )
 
         early_stopping = EarlyStopping(monitor='denorm_mse', patience=1, mode='min')
@@ -243,14 +244,16 @@ class VirtualSensingExperiment(Experiment):
 
 
 class MissingDataSensitivityExperiment(Experiment):
-    def __init__(self, p_noise, *args, **kwargs):
-        self.p_noise = p_noise
+    def __init__(self, base_noise, trainning_threshold, *args, **kwargs):
+        self.base_noise = base_noise
+        self.trainning_threshold = trainning_threshold
         super().__init__(*args, **kwargs)
         self.exp_name = 'Missing data sensitivity experiment'
 
     def prepare_data(self):
+
         dm = DataModule(dataset=self.dataset, batch_size=self.batch_size, use_time_gap_matrix=self.time_gap,
-                        p_noise=self.p_noise)
+                        p_noise=self.base_noise)
         edge_index, edge_weights = dm.get_connectivity()
         normalizer = dm.get_normalizer()
         dm.setup()
@@ -259,12 +262,67 @@ class MissingDataSensitivityExperiment(Experiment):
             edge_index = torch.from_numpy(edge_index).to(f'cuda:{self.selected_gpu[0]}')
             edge_weights = torch.from_numpy(edge_weights).to(f'cuda:{self.selected_gpu[0]}')
 
-        percentage = dm.get_missing_rate()
-        self.save_file = self.save_file.replace('.csv', f'_{int(round(percentage, -1))}.csv')
+        return dm, edge_index, edge_weights, normalizer
+    
+    def train_model(self):
+        print(f'[INFO] starting trainning base model')
+        candidates = []
+        best_candidate = None
+        best_denorm_mae = 100000
+        results_candidates = []
+        for i in tqdm(range(5)):
+            self.model = GAIN_DYNAMIC(
+                model_type=self.model_name,
+                input_size=self.dm.input_size(),
+                edge_index=self.edge_index,
+                edge_weights=self.edge_weights,
+                normalizer=self.normalizer,
+                params=self.default_hyperparameters,
+                alpha=self.default_hyperparameters['alpha'] if 'alpha' in self.default_hyperparameters.keys() else None,
+            )
+
+            self.model.set_threshold(self.trainning_threshold)
+
+            early_stopping = EarlyStopping(monitor='denorm_mse', patience=1, mode='min')
+            self.trainer = Trainer(
+                max_steps=self.max_iter_train,
+                default_root_dir='reports/logs_experiments',
+                accelerator=self.accelerator,
+                devices=self.selected_gpu,
+                gradient_clip_val=5.,
+                gradient_clip_algorithm='norm',
+                callbacks=[early_stopping],
+            )
+
+            self.trainer.fit(self.model, datamodule=self.dm)
+            results = self.trainer.test(self.model, datamodule=self.dm)[0]
+            
+            candidates.append(self.model)
+            results_candidates.append(results['denorm_mae'])
+            if results['denorm_mae'] < best_denorm_mae:
+                best_candidate = i
+                best_denorm_mae = results['denorm_mae']
+
+            print(f'[INFO] candidates until now: {[np.round(r_c, 2) for r_c in results_candidates]}')
+
+        self.model = candidates[best_candidate]
+        print(f'[INFO] error model selected in mae: {results_candidates[best_candidate]}')
+
+
+    def run_test(self, percentage, threshold):
+        if self.save_file.endswith('0.csv'):
+            self.save_file = self.save_file.replace(self.save_file[-7:], f'_{int(round(percentage, -1))}.csv')
+        else:
+            self.save_file = self.save_file.replace('.csv', f'_{int(round(percentage, -1))}.csv')
+
         self.results_file = self.load_file()
 
-        return dm, edge_index, edge_weights, normalizer
+        self.model.set_threshold(threshold)
 
+        for _ in tqdm(range(self.results_file.shape[0], self.iterations),
+                      desc=f'{self.exp_name} with {self.model_name} in {self.dataset}'):
+            results = self.trainer.test(self.model, datamodule=self.dm)[0]
+            self.save_results_file(results, self.default_hyperparameters)
 
 class RandomSearchExperiment(Experiment):
     def __init__(self, bi=False, param_loader=None, *args, **kwargs):
