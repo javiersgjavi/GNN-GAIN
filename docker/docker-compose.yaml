@@ -2,8 +2,8 @@ version: "3.7"
 
 services:
 
- container_gain_pytorch_lightning:
-  image: gain_pytorch_lightning
+ container_imputate_image:
+  image: imputate_image
   volumes:
    - ../:/app/
   stdin_open: true
