@@ -295,12 +295,3 @@ class DataModule(pl.LightningModule):
     
     def get_missing_rate(self):
         return self.missing_rate
-    
-class VirtualSensingDataModule(DataModule):
-    def __init__(self, masked=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.masked = self.data.columns[masked].get_level_values(0)
-        print(f'Nodes to mask: {self.masked}')
-        self.id_to_mask = [np.where(self.data.columns.get_level_values(0) == i)[0][0] for i in self.masked]
-        self.mask[:, self.id_to_mask] = False,
-        self.known_values[:, self.id_to_mask] = False

@@ -5,10 +5,9 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from src.models.gain import GAIN, GAIN_DYNAMIC
-from src.data.datasets import DataModule, VirtualSensingDataModule
+from src.data.datasets import DataModule
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
-from torch.optim.lr_scheduler import CosineAnnealingLR
 
 
 def print_dict(dictionary, max_iter_train):
@@ -208,40 +207,6 @@ class ExperimentAblation(Experiment):
 
         results = self.trainer.test(self.model, datamodule=self.dm)[0]
         return results
-
-
-class VirtualSensingExperiment(Experiment):
-    def __init__(self, masked=None, *args, **kwargs):
-        self.masked = masked
-        super().__init__(*args, **kwargs)
-        self.predictions = {i: None for i in range(self.iterations)}
-        self.exp_name = 'Virtual sensing experiment'
-
-    def prepare_data(self):
-        dm = VirtualSensingDataModule(dataset=self.dataset, batch_size=self.batch_size,
-                                      use_time_gap_matrix=self.time_gap, masked=self.masked)
-        edge_index, edge_weights = dm.get_connectivity()
-        normalizer = dm.get_normalizer()
-        dm.setup()
-
-        if self.accelerator == 'gpu':
-            edge_index = torch.from_numpy(edge_index).to(f'cuda:{self.selected_gpu[0]}')
-            edge_weights = torch.from_numpy(edge_weights).to(f'cuda:{self.selected_gpu[0]}')
-
-        return dm, edge_index, edge_weights, normalizer
-
-    def get_predictions(self):
-        predictions = self.trainer.predict(model=self.model, datamodule=self.dm)
-        return predictions
-
-    def run(self):
-        for i in tqdm(range(self.results_file.shape[0], self.iterations),
-                      desc=f'{self.exp_name} with {self.model_name} in {self.dataset}'):
-            _ = self.train_test(self.default_hyperparameters)
-            self.predictions[i] = self.get_predictions()
-
-        return self.predictions
-
 
 class MissingDataSensitivityExperiment(Experiment):
     def __init__(self, base_noise, trainning_threshold, *args, **kwargs):
