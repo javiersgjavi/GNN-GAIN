@@ -6,8 +6,8 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error
 from torchmetrics import MeanAbsoluteError
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
-from src.models.gnn_models import STCN, GRUGCN, RNNEncGCNDec, GatedGraphNetwork, DCRNN
-from src.models.gnn_models_bi import STCNBI, GRUGCNBI, RNNEncGCNDecBI, GatedGraphNetworkBI, DCRNNBI
+from src.models.gnn_models import GRUGCN, RNNEncGCNDec
+from src.models.gnn_models_bi import GRUGCNBI, RNNEncGCNDecBI
 
 from src.utils import loss_d, loss_g, mean_relative_error
 
@@ -76,19 +76,13 @@ class GAIN(pl.LightningModule):
         super().save_hyperparameters()
 
         model_class = {
-            'stcn': STCN,
             'grugcn': GRUGCN,
             'rnngcn': RNNEncGCNDec,
-            'ggn': GatedGraphNetwork,
-            'dcrnn': DCRNN,
         }
 
         model_class_bi = {
-            'stcn': STCNBI,
             'grugcn': GRUGCNBI,
             'rnngcn': RNNEncGCNDecBI,
-            'ggn': GatedGraphNetworkBI,
-            'dcrnn': DCRNNBI,
         }
 
         model = model_class_bi[model_type] if params['bi'] else model_class[model_type]

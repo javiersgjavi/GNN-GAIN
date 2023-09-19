@@ -6,11 +6,10 @@ from typing import Optional
 from torch.utils.data import Dataset, DataLoader
 import pytorch_lightning as pl
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.model_selection import train_test_split
-from tsl.datasets import MetrLA, AirQuality, PemsBay
+from tsl.datasets import MetrLA, PemsBay
 from tsl.ops.imputation import add_missing_values
 from src.utils import load_time_gap_matrix
-from src.data.splitters import RatioSplitter, AQICustomInSampleSplitter, AQICustomOutSampleSplitter
+from src.data.splitters import RatioSplitter
 
 
 class ElectricDataset:
@@ -152,12 +151,6 @@ class DataModule(pl.LightningModule):
                 path_time_gap_matrix = f'./data/{dataset}/time_gap_matrix_{p_fault}_{p_noise}_{56789}'
                 time_gap_matrix_f, time_gap_matrix_b = load_time_gap_matrix(base_data, path_time_gap_matrix)
 
-        elif dataset.startswith('air'):
-            base_data = AirQuality(small='36' in dataset)
-            if self.use_time_gap_matrix:
-                path_time_gap_matrix = f'./data/{dataset}/time_gap_matrix'
-                time_gap_matrix_f, time_gap_matrix_b = load_time_gap_matrix(base_data, path_time_gap_matrix)
-
         elif dataset.startswith('electric'):
             prop_missing = float(dataset.split('_')[-1])
             base_data = ElectricDataset(prop_missing=prop_missing)
@@ -202,38 +195,14 @@ class DataModule(pl.LightningModule):
         """
 
         # Split the data into train, validation, and test sets using train_test_split
-        if self.dataset_name.startswith('air'):
-            if self.dataset_name.endswith('_in'):
-
-                self.splitter = AQICustomInSampleSplitter(
-                    data=self.data,
-                    mask=self.mask,
-                    known_values=self.known_values,
-                    time_gap_matrix_f=self.time_gap_matrix_f,
-                    time_gap_matrix_b=self.time_gap_matrix_b,
-                    windows_len=36 if self.dataset_name.startswith('air-36') else 24,
-                    base_data=self.base_data,
-                    name_time_col='datetime' if self.dataset_name.startswith('air-36') else 'time',
-                )
-            else:
-                self.splitter = AQICustomOutSampleSplitter(
-                    data=self.data,
-                    mask=self.mask,
-                    known_values=self.known_values,
-                    time_gap_matrix_f=self.time_gap_matrix_f,
-                    time_gap_matrix_b=self.time_gap_matrix_b,
-                    windows_len=36 if self.dataset_name.startswith('air-36') else 24,
-                    base_data=self.base_data,
-                    name_time_col='datetime' if self.dataset_name.startswith('air-36') else 'time',
-                )
-        else:
-            self.splitter = RatioSplitter(
-                data=self.data,
-                mask=self.mask,
-                known_values=self.known_values,
-                time_gap_matrix_f=self.time_gap_matrix_f,
-                time_gap_matrix_b=self.time_gap_matrix_b,
-            )
+        
+        self.splitter = RatioSplitter(
+            data=self.data,
+            mask=self.mask,
+            known_values=self.known_values,
+            time_gap_matrix_f=self.time_gap_matrix_f,
+            time_gap_matrix_b=self.time_gap_matrix_b,
+        )
 
         train, val, test, shape = self.splitter.split()
         self.shape = shape

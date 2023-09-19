@@ -36,13 +36,7 @@ class RandomSearchLoader:
 
         params_grid_model = self.params_grid[self.model_name]
 
-        if self.model_name == 'ggn':
-            params_dict['enc_layers'] = randint_close_interval(*params_grid_model['enc_layers'], size=n_iter)
-            params_dict['gnn_layers'] = randint_close_interval(*params_grid_model['gnn_layers'], size=n_iter)
-
-            params_dict['full_graph'] = choice(params_grid_model['full_graph'], size=n_iter)
-
-        elif self.model_name == 'rnngcn':
+        if self.model_name == 'rnngcn':
             params_dict['rnn_layers'] = randint_close_interval(*params_grid_model['rnn_layers'], size=n_iter)
             params_dict['gcn_layers'] = randint_close_interval(*params_grid_model['gcn_layers'], size=n_iter)
 
@@ -51,24 +45,11 @@ class RandomSearchLoader:
 
             params_dict['cell_type'] = choice(params_grid_model['cell_type'], size=n_iter)
 
-        elif self.model_name == 'stcn':
-
-            params_dict['temporal_kernel_size'] = randint_close_interval(*params_grid_model['temporal_kernel_size'],
-                                                                         size=n_iter)
-            params_dict['spatial_kernel_size'] = randint_close_interval(*params_grid_model['spatial_kernel_size'],
-                                                                        size=n_iter)
-            params_dict['n_layers'] = randint_close_interval(*params_grid_model['n_layers'], size=n_iter)
-
         elif self.model_name == 'grugcn':
 
             params_dict['enc_layers'] = randint_close_interval(*params_grid_model['enc_layers'], size=n_iter)
             params_dict['gcn_layers'] = randint_close_interval(*params_grid_model['gcn_layers'], size=n_iter)
             params_dict['norm'] = choice(params_grid_model['norm'], size=n_iter)
-
-        elif self.model_name == 'dcrnn':
-            params_dict['kernel_size'] = randint_close_interval(*params_grid_model['enc_layers'], size=n_iter)
-            params_dict['n_layers'] = randint_close_interval(*params_grid_model['gcn_layers'], size=n_iter)
-            params_dict['dropout'] = uniform(*params_grid_model['rnn_dropout'], size=n_iter)
 
         return params_dict
 

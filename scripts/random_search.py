@@ -32,12 +32,6 @@ def main(args):
         if 'air' in datasets or 'air-36' in datasets:
             raise ValueError('Only la and bay datasets are available for point or block missing experiments')
 
-    elif scenario is not None:
-        folder = f'{folder}_in_out'
-        labels = scenario.split(',')
-        if 'la' in datasets or 'bay' in datasets:
-            raise ValueError('Only air and air-36 datasets are available for in and out sample experiments')
-
     datasets = [f'{dataset}_{label}' for dataset, label in itertools.product(datasets, labels)]
 
     folder = f'./results/{folder}'
@@ -77,12 +71,12 @@ if __name__ == '__main__':
         '--imputation_problem',
         help='type of imputation problem',
         choices=['point', 'block', 'point,block', 'block,point', None],
-        default=None,
+        default='point,block',
         type=str)
     parser.add_argument(
         '--scenario',
         help='type of imputation scenario',
-        choices=['in', 'out', 'in,out', 'out,in', None],
+        choices=[None],
         default=None,
         type=str)
     parser.add_argument(
@@ -100,7 +94,7 @@ if __name__ == '__main__':
         '--time_gap',
         help='If the model uses the time_gap matrix',
         choices=[0, 1],
-        default='1',
+        default='0',
         type=int)
     parser.add_argument(
         '--folder',
