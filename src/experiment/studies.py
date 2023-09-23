@@ -278,9 +278,10 @@ class MissingDataSensitivityStudy(AverageResults):
         res.loc['BRITS'] = [2.32, 2.34, 2.36, 2.40, 2.47, 2.57, 2.76, 3.08, 4.02]
 
         sns.set_theme()
-        sns.lineplot(x=res.columns, y=res.loc['TG-GAIN'], label='TG-GAIN')
-        sns.lineplot(x=res.columns, y=res.loc['GRIN'], label='GRIN')
-        sns.lineplot(x=res.columns, y=res.loc['BRITS'], label='BRITS')
+        plt.figure(figsize=(10, 5))
+        sns.lineplot(x=res.columns, y=res.loc['TG-GAIN'], label='TG-GAIN', markers=True, linestyle='--', marker='s')
+        sns.lineplot(x=res.columns, y=res.loc['GRIN'], label='GRIN', markers=True, linestyle='--', marker='o')
+        sns.lineplot(x=res.columns, y=res.loc['BRITS'], label='BRITS', markers=True, linestyle='--', marker='v')
         plt.xlabel('Missing percentage')
         plt.ylabel('MAE')
         plt.savefig(f'{self.folder}/sensitivity_analysis.png', dpi=300)
@@ -302,10 +303,10 @@ class MissingDataSensitivityStudy(AverageResults):
         res.loc['BRITS'] = [2.32, 2.34, 2.36, 2.40, 2.47, 2.57, 2.76, 3.08, 4.02]
 
         sns.set_theme()
-        plt.figure()
-        sns.lineplot(x=res.columns, y=res.loc['TG-GAIN'], label='TG-GAIN')
-        sns.lineplot(x=res.columns, y=res.loc['GRIN'], label='GRIN')
-        sns.lineplot(x=res.columns, y=res.loc['BRITS'], label='BRITS')
+        plt.figure(figsize=(10, 5))
+        sns.lineplot(x=res.columns, y=res.loc['TG-GAIN'], label='TG-GAIN', markers=True, linestyle='--', marker='s')
+        sns.lineplot(x=res.columns, y=res.loc['GRIN'], label='GRIN', markers=True, linestyle='--', marker='o')
+        sns.lineplot(x=res.columns, y=res.loc['BRITS'], label='BRITS', markers=True, linestyle='--', marker='v')
         plt.xlabel('Missing percentage')
         plt.ylabel('MAE')
         plt.savefig(f'{self.folder}/sensitivity_analysis_top.png', dpi=300)

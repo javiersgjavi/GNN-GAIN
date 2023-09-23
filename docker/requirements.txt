@@ -6,3 +6,4 @@ dataframe-image==0.1.5
 torch==1.13.1
 pytorch-lightning==1.7.7
 torch-geometric
+seaborn==0.12.2
