@@ -6,8 +6,8 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error
 from torchmetrics import MeanAbsoluteError
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
-from src.models.geometric.gnn_models import GRUGCN, RNNEncGCNDec
-from src.models.geometric.gnn_models_bi import GRUGCNBI, RNNEncGCNDecBI
+from src.models.gnn_models import GRUGCN, RNNEncGCNDec
+from src.models.gnn_models_bi import GRUGCNBI, RNNEncGCNDecBI
 
 from src.utils import loss_d, loss_g, mean_relative_error
 
