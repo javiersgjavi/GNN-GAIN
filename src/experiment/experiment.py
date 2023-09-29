@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from src.models.gain import GAIN, GAIN_DYNAMIC
+from src.models.g_tigre import GTIGRE, GTIGRE_DYNAMIC
 from src.data.datasets import DataModule, VirtualSensingDataModule
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
@@ -87,7 +87,7 @@ class Experiment:
         return dm, edge_index, edge_weights, normalizer
 
     def train_test(self, hyperparameters):
-        self.model = GAIN(
+        self.model = GTIGRE(
             model_type=self.model_name,
             input_size=self.dm.input_size(),
             edge_index=self.edge_index,
@@ -180,7 +180,7 @@ class ExperimentAblation(Experiment):
         return dm, edge_index, edge_weights, normalizer
 
     def train_test(self, hyperparameters):
-        self.model = GAIN(
+        self.model = GTIGRE(
             model_type=self.model_name,
             input_size=self.dm.input_size(),
             edge_index=self.edge_index,
@@ -271,7 +271,7 @@ class MissingDataSensitivityExperiment(Experiment):
         best_denorm_mae = 100000
         results_candidates = []
         for i in tqdm(range(5)):
-            self.model = GAIN_DYNAMIC(
+            self.model = GTIGRE_DYNAMIC(
                 model_type=self.model_name,
                 input_size=self.dm.input_size(),
                 edge_index=self.edge_index,

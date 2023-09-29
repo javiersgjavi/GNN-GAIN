@@ -273,13 +273,13 @@ class MissingDataSensitivityStudy(AverageResults):
     def create_plot(self):
         df = pd.read_csv(f'{self.folder}/results.csv')
         res = pd.DataFrame(columns = ['model']+[i for i in range(10, 100, 10)]).set_index('model')
-        res.loc['TG-GAIN'] = df['denorm_mae-mean'].values
+        res.loc['G-TIGRE'] = df['denorm_mae-mean'].values
         res.loc['GRIN'] = [1.87, 1.9, 1.94, 1.98, 2.04, 2.11, 2.22, 2.40, 2.84]
         res.loc['BRITS'] = [2.32, 2.34, 2.36, 2.40, 2.47, 2.57, 2.76, 3.08, 4.02]
 
         sns.set_theme()
         plt.figure(figsize=(10, 5))
-        sns.lineplot(x=res.columns, y=res.loc['TG-GAIN'], label='TG-GAIN', markers=True, linestyle='--', marker='s')
+        sns.lineplot(x=res.columns, y=res.loc['G-TIGRE'], label='G-TIGRE', markers=True, linestyle='--', marker='s')
         sns.lineplot(x=res.columns, y=res.loc['GRIN'], label='GRIN', markers=True, linestyle='--', marker='o')
         sns.lineplot(x=res.columns, y=res.loc['BRITS'], label='BRITS', markers=True, linestyle='--', marker='v')
         plt.xlabel('Missing percentage')
@@ -298,13 +298,13 @@ class MissingDataSensitivityStudy(AverageResults):
                 best_results.append(data_file['denorm_mae'].min())
 
         res = pd.DataFrame(columns = ['model']+[i for i in range(10, 100, 10)]).set_index('model')
-        res.loc['TG-GAIN'] = best_results
+        res.loc['G-TIGRE'] = best_results
         res.loc['GRIN'] = [1.87, 1.9, 1.94, 1.98, 2.04, 2.11, 2.22, 2.40, 2.84]
         res.loc['BRITS'] = [2.32, 2.34, 2.36, 2.40, 2.47, 2.57, 2.76, 3.08, 4.02]
 
         sns.set_theme()
         plt.figure(figsize=(10, 5))
-        sns.lineplot(x=res.columns, y=res.loc['TG-GAIN'], label='TG-GAIN', markers=True, linestyle='--', marker='s')
+        sns.lineplot(x=res.columns, y=res.loc['G-TIGRE'], label='G-TIGRE', markers=True, linestyle='--', marker='s')
         sns.lineplot(x=res.columns, y=res.loc['GRIN'], label='GRIN', markers=True, linestyle='--', marker='o')
         sns.lineplot(x=res.columns, y=res.loc['BRITS'], label='BRITS', markers=True, linestyle='--', marker='v')
         plt.xlabel('Missing percentage')

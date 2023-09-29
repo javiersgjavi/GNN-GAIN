@@ -51,7 +51,7 @@ class HintGenerator:
         return hint_matrix
 
 
-class GAIN(pl.LightningModule):
+class GTIGRE(pl.LightningModule):
     def __init__(self, input_size: tuple, edge_index, edge_weights, normalizer, model_type: str = None,
                  hint_rate: float = 0.9, alpha: float = 100, params: Dict = None,
                  ablation_gan=False, ablation_reconstruction=False, ablation_loop=False):
@@ -357,7 +357,7 @@ class GAIN(pl.LightningModule):
         return x_fake_denorm
 
 
-class GAIN_DYNAMIC(GAIN):
+class GTIGRE_DYNAMIC(GTIGRE):
     def __init__(self, *args, **kwargs):
         self.missing_threshold = None
         super().__init__(*args, **kwargs)
