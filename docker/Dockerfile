@@ -7,3 +7,4 @@ RUN python -m pip install --upgrade pip
 RUN pip install -r requirements.txt
 RUN pip install torch-scatter torch-sparse -f https://data.pyg.org/whl/torch-1.13.1+cu116.html
 RUN pip install git+https://github.com/TorchSpatiotemporal/tsl.git
+RUN pip install pytorch-lightning==1.7.7
