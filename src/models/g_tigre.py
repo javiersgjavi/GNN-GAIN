@@ -93,7 +93,7 @@ class GTIGRE(pl.LightningModule):
         self.loss_mse = torch.nn.MSELoss()
         self.mae = MeanAbsoluteError()
 
-        #edge_weights = torch.where(edge_weights < 0.1, torch.tensor(0, device=edge_index.device), edge_weights)
+        # edge_weights = torch.where(edge_weights < 0.1, torch.tensor(0, device=edge_index.device), edge_weights)
         args = {
             'periods': input_size[0],
             'nodes': self.nodes,
@@ -145,13 +145,12 @@ class GTIGRE(pl.LightningModule):
             x_real_denorm = self.normalizer.inverse_transform(x_real_norm.reshape(-1, self.nodes).detach().cpu())
             x_fake_denorm = self.normalizer.inverse_transform(x_fake_norm.reshape(-1, self.nodes).detach().cpu())
 
-            real_denorm= x_real_denorm[known_values.reshape(-1, self.nodes).cpu()]
+            real_denorm = x_real_denorm[known_values.reshape(-1, self.nodes).cpu()]
             fake_denorm = x_fake_denorm[known_values.reshape(-1, self.nodes).cpu()]
 
             mse_denorm = mean_squared_error(real_denorm, fake_denorm)
             mae_denorm = mean_absolute_error(real_denorm, fake_denorm)
             mre_denorm = mean_relative_error(real_denorm, fake_denorm)
-
 
             self.log('denorm_rmse', np.sqrt(mse_denorm))
             self.log('denorm_mae', mae_denorm)
@@ -177,15 +176,19 @@ class GTIGRE(pl.LightningModule):
         input_mask_bool = outputs['input_mask_bool']
 
         # --------------------- Discriminator loss ---------------------
-        d_loss = loss_d(d_pred, input_mask_int) if not self.ablation_gan else torch.zeros(1, device=d_pred.device, requires_grad=True)
+        d_loss = loss_d(d_pred, input_mask_int) if not self.ablation_gan else torch.zeros(1, device=d_pred.device,
+                                                                                          requires_grad=True)
 
         # --------------------- Generator loss -------------------------
-        g_loss_adversarial = loss_g(d_pred, input_mask_int) if not self.ablation_gan else torch.zeros(1, device=d_pred.device, requires_grad=True)
+        g_loss_adversarial = loss_g(d_pred, input_mask_int) if not self.ablation_gan else torch.zeros(1,
+                                                                                                      device=d_pred.device,
+                                                                                                      requires_grad=True)
 
-        g_loss_reconstruction = self.loss_mse(imputation[input_mask_bool], x_real[input_mask_bool]) if not self.ablation_reconstruction else torch.zeros(1, device=d_pred.device, requires_grad=True)
+        g_loss_reconstruction = self.loss_mse(imputation[input_mask_bool], x_real[
+            input_mask_bool]) if not self.ablation_reconstruction else torch.zeros(1, device=d_pred.device,
+                                                                                   requires_grad=True)
 
         g_loss = g_loss_adversarial + self.alpha * g_loss_reconstruction
-
 
         # ---------------------------------------------------------------
 
@@ -194,6 +197,14 @@ class GTIGRE(pl.LightningModule):
         self.log('G_loss_reconstruction', g_loss_reconstruction)
 
         return d_loss, g_loss
+
+    def add_noise(self, x, input_mask_bool, input_mask_int, add_noise=0.07):
+        device = input_mask_bool.device
+        sync_mask = torch.rand(input_mask_bool.shape, device=device) < add_noise
+        x_sync = torch.where(sync_mask, torch.tensor(0, device=device), x)
+        input_mask_bool_sync = torch.where(sync_mask, torch.tensor(False, device=device), input_mask_bool)
+        input_mask_int_sync = torch.where(sync_mask, torch.tensor(0, device=device), input_mask_int)
+        return x_sync, input_mask_bool_sync, input_mask_int_sync
 
     def return_gan_outputs(self, batch: Tuple) -> Dict[str, torch.Tensor]:
         """
@@ -209,12 +220,14 @@ class GTIGRE(pl.LightningModule):
         """
         x, x_real, input_mask_bool, input_mask_int, known_values, time_gap_matrix = batch
 
+        x_sync, input_mask_bool_sync, input_mask_int_sync = self.add_noise(x, input_mask_bool, input_mask_int)
+
         # Forward Generator
-        x_fake, imputation = self.generator.forward_g(x=x, input_mask=input_mask_int,
+        x_fake, imputation = self.generator.forward_g(x=x_sync, input_mask=input_mask_int_sync,
                                                       time_gap_matrix=time_gap_matrix)
 
         # Generate Hint Matrix
-        hint_matrix = self.hint_generator.generate(input_mask_int)
+        hint_matrix = self.hint_generator.generate(input_mask_int_sync)
 
         # Forward Discriminator
         d_pred = self.discriminator.forward_d(x=x_fake, hint_matrix=hint_matrix)
@@ -224,17 +237,16 @@ class GTIGRE(pl.LightningModule):
             'x_fake': x_fake,
             'd_pred': d_pred,
             'imputation': imputation,
-            'input_mask_int': input_mask_int,
-            'input_mask_bool': input_mask_bool,
+            'input_mask_int': input_mask_int_sync,
+            'input_mask_bool': input_mask_bool_sync,
             'known_values': known_values
         }
         return res
-    
+
     def multiple_imputation(self, batch):
         outputs = self.return_gan_outputs(batch)
 
         x_real = outputs['x_real']
-        x_fake = outputs['x_fake']
         input_mask_bool = outputs['input_mask_bool']
 
         d_pred_list = [outputs['d_pred']]
@@ -258,7 +270,6 @@ class GTIGRE(pl.LightningModule):
         outputs['imputation'] = imputation
 
         return outputs
-
 
     # -------------------- Methods from PyTorch Lightning --------------------
 
@@ -327,7 +338,6 @@ class GTIGRE(pl.LightningModule):
             batch_idx (int): Index of the current batch.
         """
 
-
         # Generate GAN outputs for the given batch
         outputs = self.multiple_imputation(batch) if not self.ablation_loop else self.return_gan_outputs(batch)
 
@@ -371,7 +381,8 @@ class GTIGRE_DYNAMIC(GTIGRE):
         generated_mask = torch.rand(input_mask_bool.shape, device=input_mask_bool.device) < self.missing_threshold
 
         new_x = torch.where(generated_mask, torch.tensor(0, device=input_mask_bool.device), x)
-        new_input_mask_bool = torch.where(generated_mask, torch.tensor(False, device=input_mask_bool.device), input_mask_bool)
+        new_input_mask_bool = torch.where(generated_mask, torch.tensor(False, device=input_mask_bool.device),
+                                          input_mask_bool)
         new_input_mask_int = torch.where(generated_mask, torch.tensor(0, device=input_mask_int.device), input_mask_bool)
 
         new_batch = new_x, x_real, new_input_mask_bool, new_input_mask_int, known_values, time_gap_matrix
