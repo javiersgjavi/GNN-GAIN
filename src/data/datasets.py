@@ -174,7 +174,12 @@ class DataModule(pl.LightningModule):
         self.data = base_data.dataframe()
         self.mask = base_data.training_mask
         self.known_values = base_data.eval_mask
-        self.edge_index, self.edge_weights = base_data.get_connectivity()
+        
+        if dataset.startswith('air'):
+            self.edge_index, self.edge_weights = base_data.get_connectivity(include_self=False, threshold=0.1)
+        else:
+            self.edge_index, self.edge_weights = base_data.get_connectivity()
+
         self.time_gap_matrix_f = time_gap_matrix_f
         self.time_gap_matrix_b = time_gap_matrix_b
 
