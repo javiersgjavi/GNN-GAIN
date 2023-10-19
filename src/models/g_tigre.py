@@ -206,7 +206,7 @@ class GTIGRE(pl.LightningModule):
         input_mask_int_sync = torch.where(sync_mask, torch.tensor(0, device=device), input_mask_int)
         return x_sync, input_mask_bool_sync, input_mask_int_sync
 
-    def return_gan_outputs(self, batch: Tuple) -> Dict[str, torch.Tensor]:
+    def return_gan_outputs(self, batch: Tuple, train=False) -> Dict[str, torch.Tensor]:
         """
         Returns the output tensors of the generator and discriminator for a given batch.
 
@@ -220,14 +220,15 @@ class GTIGRE(pl.LightningModule):
         """
         x, x_real, input_mask_bool, input_mask_int, known_values, time_gap_matrix = batch
 
-        x_sync, input_mask_bool_sync, input_mask_int_sync = self.add_noise(x, input_mask_bool, input_mask_int)
+        if train:
+            x, input_mask_bool, input_mask_int = self.add_noise(x, input_mask_bool, input_mask_int)
 
         # Forward Generator
-        x_fake, imputation = self.generator.forward_g(x=x_sync, input_mask=input_mask_int_sync,
+        x_fake, imputation = self.generator.forward_g(x=x, input_mask=input_mask_int,
                                                       time_gap_matrix=time_gap_matrix)
 
         # Generate Hint Matrix
-        hint_matrix = self.hint_generator.generate(input_mask_int_sync)
+        hint_matrix = self.hint_generator.generate(input_mask_int)
 
         # Forward Discriminator
         d_pred = self.discriminator.forward_d(x=x_fake, hint_matrix=hint_matrix)
@@ -237,8 +238,8 @@ class GTIGRE(pl.LightningModule):
             'x_fake': x_fake,
             'd_pred': d_pred,
             'imputation': imputation,
-            'input_mask_int': input_mask_int_sync,
-            'input_mask_bool': input_mask_bool_sync,
+            'input_mask_int': input_mask_int,
+            'input_mask_bool': input_mask_bool,
             'known_values': known_values
         }
         return res
@@ -303,7 +304,7 @@ class GTIGRE(pl.LightningModule):
         """
 
         # Generate GAN outputs for the given batch
-        outputs = self.return_gan_outputs(batch)
+        outputs = self.return_gan_outputs(batch, train=True)
 
         # Compute the discriminator and generator loss based on the generated outputs
         d_loss, g_loss = self.loss(outputs)
