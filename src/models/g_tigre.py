@@ -220,18 +220,15 @@ class GTIGRE(pl.LightningModule):
         """
         x, x_real, input_mask_bool, input_mask_int, known_values, time_gap_matrix = batch
 
-
         if train:
-            x_sync, input_mask_bool_sync, input_mask_int_sync = self.add_noise(x, input_mask_bool, input_mask_int)
-        else:
-            x_sync, input_mask_bool_sync, input_mask_int_sync = x, input_mask_bool, input_mask_int
+            x, input_mask_bool, input_mask_int = self.add_noise(x, input_mask_bool, input_mask_int)
 
         # Forward Generator
-        x_fake, imputation = self.generator.forward_g(x=x_sync, input_mask=input_mask_int_sync,
+        x_fake, imputation = self.generator.forward_g(x=x, input_mask=input_mask_int,
                                                       time_gap_matrix=time_gap_matrix)
 
         # Generate Hint Matrix
-        hint_matrix = self.hint_generator.generate(input_mask_int_sync)
+        hint_matrix = self.hint_generator.generate(input_mask_int)
 
         # Forward Discriminator
         d_pred = self.discriminator.forward_d(x=x_fake, hint_matrix=hint_matrix)
@@ -241,8 +238,8 @@ class GTIGRE(pl.LightningModule):
             'x_fake': x_fake,
             'd_pred': d_pred,
             'imputation': imputation,
-            'input_mask_int': input_mask_int_sync,
-            'input_mask_bool': input_mask_bool_sync,
+            'input_mask_int': input_mask_int,
+            'input_mask_bool': input_mask_bool,
             'known_values': known_values
         }
         return res
