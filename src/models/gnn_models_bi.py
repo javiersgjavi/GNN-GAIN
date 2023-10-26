@@ -12,7 +12,7 @@ class BaseGNN(nn.Module):
         self.edge_weights = edge_weights
         self.model = None
 
-    def define_mlp_encoder(self, mlp_layers, periods):
+    def define_mlp_encoder(self, mlp_layers):
         self.decoder_mlp = nn.Sequential()
         input_size = self.output_size*2
 
@@ -38,25 +38,9 @@ class BaseGNN(nn.Module):
         f_representation = self.model_f(input_tensor_f, edges, weights)
         b_representation = self.model_b(input_tensor_b, edges, weights)
 
-        #print(f_representation.shape, b_representation.shape)
         h = torch.cat([f_representation, torch.flip(b_representation, dims=[1])], dim=-1)
-        #print(h.shape)
         output = self.decoder_mlp(h)
-        #print(output.shape)
         return output
-
-    def prepare_inputs(self, x, input_mask, time_gap_matrix):
-        tensors_to_stack_f = [x, input_mask] if not self.time_gap_matrix else [x, input_mask,
-                                                                               time_gap_matrix['forward']]
-        input_tensor_f = torch.stack(tensors_to_stack_f).permute(1, 2, 3, 0)
-
-        tensors_to_stack_b = [x, input_mask] if not self.time_gap_matrix else [x, input_mask,
-                                                                               time_gap_matrix['backward']]
-        for i, tensor in enumerate(tensors_to_stack_b):
-            tensors_to_stack_b[i] = torch.flip(tensor, dims=[1])
-        input_tensor_b = torch.stack(tensors_to_stack_b).permute(1, 2, 3, 0)
-
-        return input_tensor_f, input_tensor_b
 
     def forward_g(self, x: torch.Tensor, input_mask: torch.Tensor, time_gap_matrix: torch.Tensor) -> Tuple[
         Tensor, Tensor]:
@@ -77,7 +61,11 @@ class BaseGNN(nn.Module):
         # Concatenate the input tensor with the noise matrix
         x = input_mask * x + (1 - input_mask) * noise_matrix
 
-        input_tensor_f, input_tensor_b = self.prepare_inputs(x, input_mask, time_gap_matrix)
+        tensors_to_stack_f = [x, input_mask] if not self.time_gap_matrix else [x, input_mask,
+                                                                               time_gap_matrix['forward']]
+        input_tensor_f = torch.stack(tensors_to_stack_f).permute(1, 2, 3, 0)
+        input_tensor_b = torch.flip(input_tensor_f, dims=[1])
+        
         imputation = self.bi_forward(input_tensor_f, input_tensor_b, self.edge_index, self.edge_weights).squeeze(dim=-1)
 
         # Concatenate the original data with the imputed data
@@ -98,7 +86,8 @@ class BaseGNN(nn.Module):
 
         """
         input_tensor_f = torch.stack([x, hint_matrix]).permute(1, 2, 3, 0)
-        input_tensor_b = torch.stack([torch.flip(x, dims=[1]), torch.flip(hint_matrix, dims=[1])]).permute(1, 2, 3, 0)
+        input_tensor_b = torch.flip(input_tensor_f, dims=[1]
+                                    )
         pred = self.bi_forward(input_tensor_f, input_tensor_b, self.edge_index, self.edge_weights).squeeze(dim=-1)
         return pred
 
@@ -134,7 +123,7 @@ class GRUGCNBI(BaseGNN):
             norm=args['norm'],
         ).apply(init_weights_xavier)
 
-        self.define_mlp_encoder(args['mlp_layers'], args['periods'])
+        self.define_mlp_encoder(args['mlp_layers'])
 
         print(self.decoder_mlp)
 
@@ -176,6 +165,6 @@ class RNNEncGCNDecBI(BaseGNN):
             cell_type=args['cell_type'],
         ).apply(init_weights_xavier)
 
-        self.define_mlp_encoder(args['mlp_layers'], args['periods'])
+        self.define_mlp_encoder(args['mlp_layers'])
 
         print(self.decoder_mlp)
