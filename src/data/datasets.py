@@ -10,6 +10,7 @@ from sklearn.model_selection import train_test_split
 from tsl.datasets import MetrLA, AirQuality, PemsBay
 from tsl.ops.imputation import add_missing_values
 from src.utils import load_time_gap_matrix
+#from src.utils import get_connectivity_aqi
 from src.data.splitters import RatioSplitter, AQICustomInSampleSplitter, AQICustomOutSampleSplitter
 
 
@@ -52,7 +53,8 @@ class DatasetLoader(Dataset):
                  edge_index=None,
                  edge_weights=None,
                  time_gap_matrix_f=None,
-                 time_gap_matrix_b=None):
+                 time_gap_matrix_b=None,
+                 exog=None):
         """
         Initialize Dataset object
 
@@ -69,6 +71,7 @@ class DatasetLoader(Dataset):
         self.edge_weights = edge_weights
         self.time_gap_matrix_f = time_gap_matrix_f
         self.time_gap_matrix_b = time_gap_matrix_b
+        self.exog = exog.astype(data.dtype) if exog is not None else None
 
         self.data_missing = np.where(self.input_mask_bool, self.data, 0.0)
 
@@ -86,8 +89,19 @@ class DatasetLoader(Dataset):
         Tuple: A tuple containing the missing data, the complete data, and the input mask.
         """
 
-        return self.data_missing[idx], self.data[idx], self.input_mask_bool[idx], self.input_mask_int[idx], \
-            self.known_values[idx], {'forward': self.time_gap_matrix_f[idx], 'backward': self.time_gap_matrix_b[idx]}
+        res = (
+            self.data_missing[idx], 
+            self.data[idx], 
+            self.input_mask_bool[idx], 
+            self.input_mask_int[idx],
+            self.known_values[idx], 
+            {'forward': self.time_gap_matrix_f[idx], 'backward': self.time_gap_matrix_b[idx]},
+        )
+
+        if self.exog is not None:
+            res = res + (self.exog[idx],)
+
+        return res
 
     def get_missing_rate(self):
         return np.round(np.mean(self.input_mask_int == 0) * 100, 2)
@@ -249,7 +263,8 @@ class DataModule(pl.LightningModule):
             mask=train['mask'],
             known_values=train['known_values'],
             time_gap_matrix_f=train['tgm_f'],
-            time_gap_matrix_b=train['tgm_b']
+            time_gap_matrix_b=train['tgm_b'],
+            exog=train['exog'] if 'exog' in train else None
         )
 
         data_val = DatasetLoader(
@@ -257,7 +272,8 @@ class DataModule(pl.LightningModule):
             mask=val['mask'],
             known_values=val['known_values'],
             time_gap_matrix_f=val['tgm_f'],
-            time_gap_matrix_b=val['tgm_b']
+            time_gap_matrix_b=val['tgm_b'],
+            exog=val['exog'] if 'exog' in val else None
         )
 
         data_test = DatasetLoader(
@@ -265,7 +281,8 @@ class DataModule(pl.LightningModule):
             mask=test['mask'],
             known_values=test['known_values'],
             time_gap_matrix_f=test['tgm_f'],
-            time_gap_matrix_b=test['tgm_b']
+            time_gap_matrix_b=test['tgm_b'],
+            exog=test['exog'] if 'exog' in test else None
         )
 
         # Create DataLoader objects for each set

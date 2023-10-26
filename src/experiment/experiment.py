@@ -97,9 +97,10 @@ class Experiment:
             alpha=hyperparameters['alpha'] if 'alpha' in hyperparameters.keys() else None,
         )
 
-        early_stopping = EarlyStopping(monitor='denorm_mse', patience=1, mode='min')
+        early_stopping = EarlyStopping(monitor='denorm_mse', patience=5, mode='min')
         self.trainer = Trainer(
-            max_steps=self.max_iter_train,
+            #max_steps=self.max_iter_train,
+            max_epochs=100,
             default_root_dir='reports/logs_experiments',
             accelerator=self.accelerator,
             devices=self.selected_gpu,

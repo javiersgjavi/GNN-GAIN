@@ -3,7 +3,7 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 
 from sklearn.model_selection import train_test_split
-from src.utils import create_windows_from_sequence
+from src.utils import create_windows_from_sequence, get_stats_month
 
 
 class Splitter:
@@ -88,7 +88,9 @@ class RatioSplitter(Splitter):
 class AQICustomSplitter(Splitter):
     def __init__(self, base_data=None, test_months=None, name_time_col=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.stats = get_stats_month(base_data.dataframe())
         self.base_data = base_data
+        self.dates = base_data.dataframe().index
         self.test_months = test_months if test_months is not None else [6, 9, 12, 3]
 
         self.name_time_col = name_time_col
@@ -145,28 +147,31 @@ class AQICustomInSampleSplitter(AQICustomSplitter):
 class AQICustomOutSampleSplitter(AQICustomSplitter):
 
     def create_windows_iterative(self, indexes_set):
-        data, mask, known_values, tgm_f, tgm_b = [], [], [], [], []
+        data, mask, known_values, tgm_f, tgm_b, exog = [], [], [], [], [], []
         for index_set in indexes_set:
-            data_i, mask_i, known_values_i, tgm_f_i, tgm_b_i = create_windows_from_sequence(
+            data_i, mask_i, known_values_i, tgm_f_i, tgm_b_i, exog_i = create_windows_from_sequence(
                 self.data.iloc[index_set],
                 self.mask[index_set],
                 self.known_values[index_set],
                 self.tgm_f[index_set],
                 self.tgm_b[index_set],
                 window_len=self.windows_len,
-                stride=self.stride
+                stride=self.stride,
+                exog_time=(self.stats, self.dates),
             )
             data.append(data_i)
             mask.append(mask_i)
             known_values.append(known_values_i)
             tgm_f.append(tgm_f_i)
             tgm_b.append(tgm_b_i)
+            exog.append(exog_i)
 
         res = {'data': np.concatenate(data),
                'mask': np.concatenate(mask),
                'known_values': np.concatenate(known_values),
                'tgm_f': np.concatenate(tgm_f),
-               'tgm_b': np.concatenate(tgm_b)}
+               'tgm_b': np.concatenate(tgm_b),
+               'exog': np.concatenate(exog) if exog[0] is not None else None}
 
         return res
 

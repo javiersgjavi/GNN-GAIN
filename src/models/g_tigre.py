@@ -106,8 +106,8 @@ class GTIGRE(pl.LightningModule):
         # Three main components of the GAIN model
 
         self.use_time_gap = params['use_time_gap_matrix']
-        self.generator = model(self.args, time_gap_matrix=self.use_time_gap)
-        self.discriminator = model(self.args)
+        self.generator = model(self.args, time_gap_matrix=self.use_time_gap, exog=True)
+        self.discriminator = model(self.args, exog=False)
 
         self.hint_generator = HintGenerator(prop_hint=hint_rate)
 
@@ -206,7 +206,7 @@ class GTIGRE(pl.LightningModule):
         input_mask_int_sync = torch.where(sync_mask, torch.tensor(0, device=device), input_mask_int)
         return x_sync, input_mask_bool_sync, input_mask_int_sync
 
-    def return_gan_outputs(self, batch: Tuple) -> Dict[str, torch.Tensor]:
+    def return_gan_outputs(self, batch: Tuple, train=False) -> Dict[str, torch.Tensor]:
         """
         Returns the output tensors of the generator and discriminator for a given batch.
 
@@ -218,19 +218,25 @@ class GTIGRE(pl.LightningModule):
             A dictionary containing the output tensors of the generator and discriminator for the batch, as well as the
             real input and the input mask.
         """
-        x, x_real, input_mask_bool, input_mask_int, known_values, time_gap_matrix = batch
+        x, x_real, input_mask_bool, input_mask_int, known_values, time_gap_matrix, exog = batch
+        #print(x.shape)
 
-        x_sync, input_mask_bool_sync, input_mask_int_sync = self.add_noise(x, input_mask_bool, input_mask_int)
+        if train:
+            x_sync, input_mask_bool_sync, input_mask_int_sync = self.add_noise(x, input_mask_bool, input_mask_int)
+        else:
+            x_sync, input_mask_bool_sync, input_mask_int_sync = x, input_mask_bool, input_mask_int
 
         # Forward Generator
-        x_fake, imputation = self.generator.forward_g(x=x_sync, input_mask=input_mask_int_sync,
-                                                      time_gap_matrix=time_gap_matrix)
+        x_fake, imputation = self.generator.forward_g(x=x_sync, 
+                                                      input_mask=input_mask_int_sync,
+                                                      time_gap_matrix=time_gap_matrix,
+                                                      exog=exog)
 
         # Generate Hint Matrix
         hint_matrix = self.hint_generator.generate(input_mask_int_sync)
 
         # Forward Discriminator
-        d_pred = self.discriminator.forward_d(x=x_fake, hint_matrix=hint_matrix)
+        d_pred = self.discriminator.forward_d(x=x_fake, hint_matrix=hint_matrix, exog=None)
 
         res = {
             'x_real': x_real,
