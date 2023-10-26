@@ -14,10 +14,10 @@ class BaseGNN(nn.Module):
 
     def define_mlp_encoder(self, mlp_layers, periods):
         self.decoder_mlp = nn.Sequential()
-        input_size = int(periods * 2)
+        input_size = self.output_size*2
 
         for i, l in enumerate(range(mlp_layers, 1, -1)):
-            output_size = int(((l - 1) * periods / mlp_layers) + periods)
+            output_size = int(((l - 1) *  (self.output_size*2)/ mlp_layers) + 1)
             output_size = output_size if output_size > 0 else 1
             self.decoder_mlp.add_module(
                 f'linear_{i}',
@@ -29,17 +29,20 @@ class BaseGNN(nn.Module):
             )
             input_size = output_size
 
-        self.decoder_mlp.add_module(f'final_linear', nn.Linear(input_size, periods))
+        self.decoder_mlp.add_module(f'final_linear', nn.Linear(input_size, 1))
         self.decoder_mlp.add_module(f'final_activation', nn.Sigmoid())
 
         self.decoder_mlp.apply(init_weights_xavier)
 
     def bi_forward(self, input_tensor_f, input_tensor_b, edges, weights):
-        f_representation = self.model_f(input_tensor_f, edges, weights).squeeze(dim=-1).permute(0, 2, 1)
-        b_representation = self.model_b(input_tensor_b, edges, weights).squeeze(dim=-1).permute(0, 2, 1)
+        f_representation = self.model_f(input_tensor_f, edges, weights)
+        b_representation = self.model_b(input_tensor_b, edges, weights)
 
-        h = torch.cat([f_representation, b_representation], dim=-1)
-        output = self.decoder_mlp(h).permute(0, 2, 1)
+        #print(f_representation.shape, b_representation.shape)
+        h = torch.cat([f_representation, torch.flip(b_representation, dims=[1])], dim=-1)
+        #print(h.shape)
+        output = self.decoder_mlp(h)
+        #print(output.shape)
         return output
 
     def prepare_inputs(self, x, input_mask, time_gap_matrix):
@@ -105,12 +108,14 @@ class GRUGCNBI(BaseGNN):
         super().__init__(edge_index=args['edge_index'], edge_weights=args['edge_weights'])
 
         self.time_gap_matrix = time_gap_matrix
+        self.hidden_size = int(args['periods'] * args['hidden_size'])
+        self.output_size = self.hidden_size//2
 
         self.model_f = GRUGCNModel(
             exog_size=0,
             input_size=2 if not self.time_gap_matrix else 3,
-            output_size=1,
-            hidden_size=int(args['periods'] * args['hidden_size']),
+            output_size=self.output_size,
+            hidden_size=self.hidden_size,
             horizon=args['periods'],
             activation=args['activation'],
             enc_layers=args['enc_layers'],
@@ -120,9 +125,8 @@ class GRUGCNBI(BaseGNN):
 
         self.model_b = GRUGCNModel(
             exog_size=0,
-            input_size=2 if not self.time_gap_matrix else 3,
-            output_size=1,
-            hidden_size=int(args['periods'] * args['hidden_size']),
+            output_size=self.hidden_size//2,
+            hidden_size=self.hidden_size,
             horizon=args['periods'],
             activation=args['activation'],
             enc_layers=args['enc_layers'],
@@ -141,12 +145,14 @@ class RNNEncGCNDecBI(BaseGNN):
         super().__init__(edge_index=args['edge_index'], edge_weights=args['edge_weights'])
 
         self.time_gap_matrix = time_gap_matrix
+        self.hidden_size = int(args['periods'] * args['hidden_size'])
+        self.output_size = self.hidden_size//2
 
         self.model_f = RNNEncGCNDecModel(
             exog_size=0,
             input_size=2 if not self.time_gap_matrix else 3,
-            output_size=1,
-            hidden_size=int(args['periods'] * args['hidden_size']),
+            output_size=self.output_size,
+            hidden_size=self.hidden_size,
             horizon=args['periods'],
             rnn_layers=args['rnn_layers'],
             gcn_layers=args['gcn_layers'],
@@ -159,8 +165,8 @@ class RNNEncGCNDecBI(BaseGNN):
         self.model_b = RNNEncGCNDecModel(
             exog_size=0,
             input_size=2 if not self.time_gap_matrix else 3,
-            output_size=1,
-            hidden_size=int(args['periods'] * args['hidden_size']),
+            output_size=self.output_size,
+            hidden_size=self.hidden_size,
             horizon=args['periods'],
             rnn_layers=args['rnn_layers'],
             gcn_layers=args['gcn_layers'],

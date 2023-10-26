@@ -206,7 +206,7 @@ class GTIGRE(pl.LightningModule):
         input_mask_int_sync = torch.where(sync_mask, torch.tensor(0, device=device), input_mask_int)
         return x_sync, input_mask_bool_sync, input_mask_int_sync
 
-    def return_gan_outputs(self, batch: Tuple) -> Dict[str, torch.Tensor]:
+    def return_gan_outputs(self, batch: Tuple, train=False) -> Dict[str, torch.Tensor]:
         """
         Returns the output tensors of the generator and discriminator for a given batch.
 
@@ -220,7 +220,11 @@ class GTIGRE(pl.LightningModule):
         """
         x, x_real, input_mask_bool, input_mask_int, known_values, time_gap_matrix = batch
 
-        x_sync, input_mask_bool_sync, input_mask_int_sync = self.add_noise(x, input_mask_bool, input_mask_int)
+
+        if train:
+            x_sync, input_mask_bool_sync, input_mask_int_sync = self.add_noise(x, input_mask_bool, input_mask_int)
+        else:
+            x_sync, input_mask_bool_sync, input_mask_int_sync = x, input_mask_bool, input_mask_int
 
         # Forward Generator
         x_fake, imputation = self.generator.forward_g(x=x_sync, input_mask=input_mask_int_sync,
@@ -303,7 +307,7 @@ class GTIGRE(pl.LightningModule):
         """
 
         # Generate GAN outputs for the given batch
-        outputs = self.return_gan_outputs(batch)
+        outputs = self.return_gan_outputs(batch, train=True)
 
         # Compute the discriminator and generator loss based on the generated outputs
         d_loss, g_loss = self.loss(outputs)

@@ -106,7 +106,7 @@ class DataModule(pl.LightningModule):
     """
 
     def __init__(self,
-                 dataset: str = 'credit',
+                 dataset: str = 'la_point',
                  batch_size: int = 128,
                  val_len: float = 0.2,
                  test_len: float = 0.1,
