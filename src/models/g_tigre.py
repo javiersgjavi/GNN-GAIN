@@ -220,8 +220,8 @@ class GTIGRE(pl.LightningModule):
         """
         x, x_real, input_mask_bool, input_mask_int, known_values, time_gap_matrix = batch
 
-        if train:
-            x, input_mask_bool, input_mask_int = self.add_noise(x, input_mask_bool, input_mask_int)
+        #if train:
+        #    x, input_mask_bool, input_mask_int = self.add_noise(x, input_mask_bool, input_mask_int)
 
         # Forward Generator
         x_fake, imputation = self.generator.forward_g(x=x, input_mask=input_mask_int,
