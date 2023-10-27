@@ -157,6 +157,9 @@ class GTIGRE(pl.LightningModule):
             self.log('denorm_mse', mse_denorm)
             self.log('denorm_mre', mre_denorm)
 
+    def ws_loss(self, outputs):
+        pass
+
     def loss(self, outputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         """
             Calculates the loss of the generator and discriminator. The losses are calculated with the
