@@ -5,6 +5,7 @@ from typing import Dict, Tuple
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from torchmetrics import MeanAbsoluteError
 from torch.optim.lr_scheduler import CosineAnnealingLR
+import torch.autograd as autograd
 
 from src.models.gnn_models import GRUGCN, RNNEncGCNDec
 from src.models.gnn_models_bi import GRUGCNBI, RNNEncGCNDecBI
@@ -93,7 +94,6 @@ class GTIGRE(pl.LightningModule):
         self.loss_mse = torch.nn.MSELoss()
         self.mae = MeanAbsoluteError()
 
-        # edge_weights = torch.where(edge_weights < 0.1, torch.tensor(0, device=edge_index.device), edge_weights)
         args = {
             'periods': input_size[0],
             'nodes': self.nodes,
@@ -106,7 +106,7 @@ class GTIGRE(pl.LightningModule):
         # Three main components of the GAIN model
 
         self.use_time_gap = params['use_time_gap_matrix']
-        self.generator = model(self.args, time_gap_matrix=self.use_time_gap)
+        self.generator = model(self.args, time_gap_matrix=self.use_time_gap, gen=True)
         self.discriminator = model(self.args)
 
         self.hint_generator = HintGenerator(prop_hint=hint_rate)
@@ -115,6 +115,7 @@ class GTIGRE(pl.LightningModule):
         self.ablation_reconstruction = ablation_reconstruction
         self.ablation_loop = ablation_loop
 
+        self.d_i = 0
     # -------------------- Custom methods --------------------
 
     def calculate_error_imputation(self, outputs: Dict[str, torch.Tensor], type_step: str = 'train') -> None:
@@ -158,7 +159,26 @@ class GTIGRE(pl.LightningModule):
             self.log('denorm_mre', mre_denorm)
 
     def ws_loss(self, outputs):
-        pass
+        d_pred = outputs['d_pred']
+        real_samples = outputs['input_mask_bool']
+
+        critic_real = d_pred[real_samples].mean()
+        critic_fake = d_pred[~real_samples].mean()
+
+        #gradient_penalty = self.compute_gradient_penalty(d_pred, real_samples, fake_samples)
+
+        d_loss = -critic_real + critic_fake #+ gradient_penalty
+        
+        reconstruction_loss = self.loss_mse(outputs['imputation'][real_samples], outputs['x_real'][real_samples])
+        g_loss = -critic_fake + self.alpha*reconstruction_loss
+
+        log_dict = {'Generator': critic_fake, 'Discriminator': d_loss}
+        self.logger.experiment.add_scalars(f'G VS D (fake)', log_dict, self.global_step)
+        self.log('G_loss_reconstruction', reconstruction_loss)
+
+        return d_loss, g_loss
+
+
 
     def loss(self, outputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -187,9 +207,10 @@ class GTIGRE(pl.LightningModule):
                                                                                                       device=d_pred.device,
                                                                                                       requires_grad=True)
 
-        g_loss_reconstruction = self.loss_mse(imputation[input_mask_bool], x_real[
-            input_mask_bool]) if not self.ablation_reconstruction else torch.zeros(1, device=d_pred.device,
-                                                                                   requires_grad=True)
+        g_loss_reconstruction = self.loss_mse(
+            imputation[input_mask_bool],
+            x_real[input_mask_bool]
+            ) if not self.ablation_reconstruction else torch.zeros(1, device=d_pred.device, requires_grad=True)
 
         g_loss = g_loss_adversarial + self.alpha * g_loss_reconstruction
 
@@ -284,12 +305,15 @@ class GTIGRE(pl.LightningModule):
         opt_d = torch.optim.Adam(self.discriminator.parameters(), lr=self.args['learning_rate'], weight_decay=0)
         opt_g = torch.optim.Adam(self.generator.parameters(), lr=self.args['learning_rate'], weight_decay=0)
 
-        # define schedulers
-        d_scheduler = CosineAnnealingLR(opt_d, T_max=5000, eta_min=0.0001)
-        g_scheduler = CosineAnnealingLR(opt_g, T_max=5000, eta_min=0.0001)
+        #opt_d = torch.optim.RMSprop(self.discriminator.parameters(), lr=0.00005, weight_decay=0)
+        #opt_g = torch.optim.RMSprop(self.generator.parameters(), lr=0.00005, weight_decay=0)
 
-        d_opt_params = {'optimizer': opt_d, 'lr_scheduler': d_scheduler}
-        g_opt_params = {'optimizer': opt_g, 'lr_scheduler': g_scheduler}
+        # define schedulers
+        #d_scheduler = CosineAnnealingLR(opt_d, T_max=5000, eta_min=0.0001)
+        #g_scheduler = CosineAnnealingLR(opt_g, T_max=5000, eta_min=0.0001)
+
+        d_opt_params = {'optimizer': opt_d}#, 'lr_scheduler': d_scheduler}
+        g_opt_params = {'optimizer': opt_g}#, 'lr_scheduler': g_scheduler}
 
         return d_opt_params, g_opt_params
 
@@ -310,13 +334,29 @@ class GTIGRE(pl.LightningModule):
         outputs = self.return_gan_outputs(batch, train=True)
 
         # Compute the discriminator and generator loss based on the generated outputs
-        d_loss, g_loss = self.loss(outputs)
+        #d_loss, g_loss = self.loss(outputs)
+
+        
 
         # Calculate the mean squared error (MSE) between the real and imputed data
         self.calculate_error_imputation(outputs)
 
         # Select the appropriate loss based on the optimizer index
-        loss = d_loss if optimizer_idx == 0 else g_loss
+        #loss = d_loss if optimizer_idx == 0 else g_loss
+
+        if optimizer_idx == 0 and self.d_i <5:
+            d_loss, _ = self.ws_loss(outputs)
+            loss = d_loss
+            self.d_i +=1
+            #print(f'D_loss: {d_loss.item()}')
+
+        elif optimizer_idx == 1 and self.d_i >= 5:
+            _, g_loss = self.ws_loss(outputs)
+            loss = g_loss
+            self.d_i = 0
+            #print(f'G_loss: {g_loss.item()}')
+        else:
+            loss = torch.zeros(1, device=outputs['d_pred'].device, requires_grad=True)
 
         return loss
 
@@ -369,7 +409,6 @@ class GTIGRE(pl.LightningModule):
         x_fake_denorm = self.normalizer.inverse_transform(x_fake.reshape(-1, self.nodes).detach().cpu())
 
         return x_fake_denorm
-
 
 class GTIGRE_DYNAMIC(GTIGRE):
     def __init__(self, *args, **kwargs):
