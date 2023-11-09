@@ -175,9 +175,4 @@ class RNNEncGCNDecBI(BaseGNN):
 
         self.decoder_mlp.apply(init_weights_xavier)
 
-        if not self.gen:
-            #self.model_f.apply(add_sn)
-            #self.model_b.apply(add_sn)
-            self.decoder_mlp.apply(add_sn)
-
         print(self.decoder_mlp)

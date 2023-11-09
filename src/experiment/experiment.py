@@ -194,10 +194,10 @@ class ExperimentAblation(Experiment):
             ablation_loop = True if 'no_loop' in self.ablation else False
         )
 
-        early_stopping = EarlyStopping(monitor='denorm_mse', patience=40, mode='min')
+        early_stopping = EarlyStopping(monitor='denorm_mse', patience=2, mode='min')
         self.trainer = Trainer(
-            #max_steps=self.max_iter_train,
-            max_epochs=300,
+            max_steps=self.max_iter_train,
+            #max_epochs=300,
             default_root_dir='reports/logs_experiments',
             accelerator=self.accelerator,
             devices=self.selected_gpu,

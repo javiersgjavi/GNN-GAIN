@@ -158,21 +158,24 @@ class GTIGRE(pl.LightningModule):
             self.log('denorm_mse', mse_denorm)
             self.log('denorm_mre', mre_denorm)
 
-    def ws_loss(self, outputs):
+    def ls_loss(self, outputs):
         d_pred = outputs['d_pred']
-        real_samples = outputs['input_mask_bool']
+        mask_real_samples = outputs['input_mask_bool']
+        real_samples = outputs['x_real'][mask_real_samples]
+        imputated_real_samples = outputs['imputation'][mask_real_samples]
 
-        critic_real = d_pred[real_samples].mean()
-        critic_fake = d_pred[~real_samples].mean()
-
-        #gradient_penalty = self.compute_gradient_penalty(d_pred, real_samples, fake_samples)
-
-        d_loss = -critic_real + critic_fake #+ gradient_penalty
+        critic_real = d_pred[mask_real_samples]
+        critic_fake = d_pred[~mask_real_samples]
         
-        reconstruction_loss = self.loss_mse(outputs['imputation'][real_samples], outputs['x_real'][real_samples])
-        g_loss = -critic_fake + self.alpha*reconstruction_loss
+        real_loss = self.loss_mse(critic_real, torch.ones_like(critic_real))
+        fake_loss = self.loss_mse(critic_fake, torch.zeros_like(critic_fake)) 
+        d_loss = 0.5*(real_loss + fake_loss)
+        
+        reconstruction_loss = self.loss_mse(imputated_real_samples, real_samples)
+        adversarial_loss = self.loss_mse(critic_fake, torch.ones_like(critic_fake))
+        g_loss = 0.5*adversarial_loss + self.alpha*reconstruction_loss
 
-        log_dict = {'Generator': critic_fake, 'Discriminator': d_loss}
+        log_dict = {'Generator': adversarial_loss, 'Discriminator': d_loss}
         self.logger.experiment.add_scalars(f'G VS D (fake)', log_dict, self.global_step)
         self.log('G_loss_reconstruction', reconstruction_loss)
 
@@ -222,14 +225,6 @@ class GTIGRE(pl.LightningModule):
 
         return d_loss, g_loss
 
-    def add_noise(self, x, input_mask_bool, input_mask_int, add_noise=0.07):
-        device = input_mask_bool.device
-        sync_mask = torch.rand(input_mask_bool.shape, device=device) < add_noise
-        x_sync = torch.where(sync_mask, torch.tensor(0, device=device), x)
-        input_mask_bool_sync = torch.where(sync_mask, torch.tensor(False, device=device), input_mask_bool)
-        input_mask_int_sync = torch.where(sync_mask, torch.tensor(0, device=device), input_mask_int)
-        return x_sync, input_mask_bool_sync, input_mask_int_sync
-
     def return_gan_outputs(self, batch: Tuple, train=False) -> Dict[str, torch.Tensor]:
         """
         Returns the output tensors of the generator and discriminator for a given batch.
@@ -243,9 +238,6 @@ class GTIGRE(pl.LightningModule):
             real input and the input mask.
         """
         x, x_real, input_mask_bool, input_mask_int, known_values, time_gap_matrix = batch
-
-        #if train:
-        #    x, input_mask_bool, input_mask_int = self.add_noise(x, input_mask_bool, input_mask_int)
 
         # Forward Generator
         x_fake, imputation = self.generator.forward_g(x=x, input_mask=input_mask_int,
@@ -334,29 +326,13 @@ class GTIGRE(pl.LightningModule):
         outputs = self.return_gan_outputs(batch, train=True)
 
         # Compute the discriminator and generator loss based on the generated outputs
-        #d_loss, g_loss = self.loss(outputs)
-
-        
+        d_loss, g_loss = self.ls_loss(outputs)
 
         # Calculate the mean squared error (MSE) between the real and imputed data
         self.calculate_error_imputation(outputs)
 
         # Select the appropriate loss based on the optimizer index
-        #loss = d_loss if optimizer_idx == 0 else g_loss
-
-        if optimizer_idx == 0 and self.d_i <5:
-            d_loss, _ = self.ws_loss(outputs)
-            loss = d_loss
-            self.d_i +=1
-            #print(f'D_loss: {d_loss.item()}')
-
-        elif optimizer_idx == 1 and self.d_i >= 5:
-            _, g_loss = self.ws_loss(outputs)
-            loss = g_loss
-            self.d_i = 0
-            #print(f'G_loss: {g_loss.item()}')
-        else:
-            loss = torch.zeros(1, device=outputs['d_pred'].device, requires_grad=True)
+        loss = d_loss if optimizer_idx == 0 else g_loss
 
         return loss
 
