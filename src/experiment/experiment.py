@@ -106,6 +106,7 @@ class Experiment:
             gradient_clip_val=5.,
             gradient_clip_algorithm='norm',
             callbacks=[early_stopping],
+            detect_anomaly=True
         )
 
         self.trainer.fit(self.model, datamodule=self.dm)
@@ -193,9 +194,10 @@ class ExperimentAblation(Experiment):
             ablation_loop = True if 'no_loop' in self.ablation else False
         )
 
-        early_stopping = EarlyStopping(monitor='denorm_mse', patience=1, mode='min')
+        early_stopping = EarlyStopping(monitor='denorm_mse', patience=2, mode='min')
         self.trainer = Trainer(
             max_steps=self.max_iter_train,
+            #max_epochs=300,
             default_root_dir='reports/logs_experiments',
             accelerator=self.accelerator,
             devices=self.selected_gpu,
@@ -248,12 +250,6 @@ class MissingDataSensitivityExperiment(Experiment):
         self.base_noise = base_noise
         self.trainning_threshold = trainning_threshold
         super().__init__(*args, **kwargs)
-        self.exp_name = 'Missing data sensitivity experiment'
-
-    def prepare_data(self):
-
-        dm = DataModule(dataset=self.dataset, batch_size=self.batch_size, use_time_gap_matrix=self.time_gap,
-                        p_noise=self.base_noise)
         edge_index, edge_weights = dm.get_connectivity()
         normalizer = dm.get_normalizer()
         dm.setup()

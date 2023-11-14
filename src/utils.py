@@ -5,6 +5,8 @@ from torch import nn
 from tqdm import tqdm
 from typing import Tuple
 from tsl.ops.imputation import add_missing_values
+from tsl.nn.layers.recurrent import RNNCellBase
+import tsl
 
 
 def init_weights_xavier(m: nn.Module) -> None:
@@ -144,3 +146,9 @@ def loss_g(d_prob: torch.Tensor, m: torch.Tensor) -> torch.Tensor:
         torch.Tensor: Generator loss
     """
     return -torch.mean((1 - m) * torch.log(d_prob + 1e-8))
+
+def add_sn(m):    
+    if isinstance(m, (nn.Linear)):
+        return nn.utils.spectral_norm(m)
+    else:
+        return m
