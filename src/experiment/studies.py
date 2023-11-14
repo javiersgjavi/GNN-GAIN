@@ -5,7 +5,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_error
-from src.data.datasets import DataModule
+from src.data.datamodule import DataModule
 from src.experiment.experiment import Experiment, ExperimentAblation, VirtualSensingExperiment, MissingDataSensitivityExperiment
 
 class AverageResults:

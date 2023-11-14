@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from datasets import DataModule
+from src.data.datamodule import DataModule
 
 from tsl.ops.imputation import add_missing_values
 from tsl.datasets import MetrLA, PemsBay

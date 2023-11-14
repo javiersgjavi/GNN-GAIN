@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from src.models.g_tigre import GTIGRE, GTIGRE_DYNAMIC
-from src.data.datasets import DataModule, VirtualSensingDataModule
+from src.data.datamodule import DataModule, VirtualSensingDataModule
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from torch.optim.lr_scheduler import CosineAnnealingLR
