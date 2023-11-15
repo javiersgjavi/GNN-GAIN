@@ -9,6 +9,7 @@ import torch.autograd as autograd
 
 from src.models.gnn_models import GRUGCN, RNNEncGCNDec
 from src.models.gnn_models_bi import GRUGCNBI, RNNEncGCNDecBI
+from src.models.custom_models import BiModel
 
 from src.utils import loss_d, loss_g, mean_relative_error
 
@@ -86,7 +87,8 @@ class GTIGRE(pl.LightningModule):
             'rnngcn': RNNEncGCNDecBI,
         }
 
-        model = model_class_bi[model_type] if params['bi'] else model_class[model_type]
+        #model = model_class_bi[model_type] if params['bi'] else model_class[model_type]
+        model = BiModel
 
         self.alpha = alpha if alpha is not None else 100
         self.nodes = input_size[1]
