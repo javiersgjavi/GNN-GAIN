@@ -50,11 +50,6 @@ class RandomSearchLoader:
             
         }
 
-        if self.bi:
-            params_dict['mlp_layers'] = randint_close_interval(*self.params_grid['mlp_layers'], size=n_iter)
-
-        params_grid_model = self.params_grid[self.model_name]
-
         if self.model_name == 'rnn':
             params_dict['encoder_type'] = ['rnn' for _ in range(n_iter)]
             params_dict['encoder']['cell'] = choice(self.params_grid_model['rnn']['cell'], size=n_iter)
@@ -112,6 +107,7 @@ class RandomSearch:
             'denorm_mse',
             'denorm_mre',
             'denorm_rmse',
+            'time',
             'params'
         ]
 
@@ -143,6 +139,7 @@ class RandomSearch:
                     best_result['denorm_mse'],
                     best_result['denorm_mre'],
                     best_result['denorm_rmse'],
+                    best_result['time'],
                     best_result['params']
                 ]
                 result_file.loc[len(result_file)] = row
@@ -168,6 +165,7 @@ class RandomSearch:
                 best_result['denorm_mse'],
                 best_result['denorm_mre'],
                 best_result['denorm_rmse'],
+                best_result['time'],
                 best_result['params']
             ]
             result_file.loc[len(result_file)] = row

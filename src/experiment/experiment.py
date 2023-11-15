@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import torch
 import numpy as np
 import pandas as pd
@@ -28,6 +29,7 @@ class Experiment:
             'denorm_mse',
             'denorm_mre',
             'denorm_rmse',
+            'time',
             'params'
         ]
 
@@ -109,9 +111,12 @@ class Experiment:
             detect_anomaly=True
         )
 
+        start_time = time.time()
         self.trainer.fit(self.model, datamodule=self.dm)
+        elapsed_time = time.time() - start_time
 
         results = self.trainer.test(self.model, datamodule=self.dm)[0]
+        results['time'] = elapsed_time
         return results
 
     def save_results_file(self, results, params):
@@ -123,6 +128,7 @@ class Experiment:
             results['denorm_mse'],
             results['denorm_mre'],
             results['denorm_rmse'],
+            results['time'],
             params
         ]
 
