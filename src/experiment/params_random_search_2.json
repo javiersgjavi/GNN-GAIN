@@ -1,0 +1,59 @@
+{
+    "log_learning_rate": [-4, -2],
+
+    "mlp_activation": ["relu", "tanh", "silu"],
+    "encoder_activation": ["relu", "tanh", "silu"],
+    "decoder_activation": ["relu", "tanh", "silu"],
+
+    "mlp_layers": [1, 4],
+    "encoder_layers": [1, 4],
+    "decoder_layers": [1, 4],
+
+    "mlp_hidden_size":[0.1, 1],
+    "encoder_hidden_size":[0.5, 1.5],
+
+    "mlp_dropout": [0, 0.5],
+    "encoder_dropout": [0, 0.5],
+    "decoder_dropout": [0, 0.5],
+
+    "alpha": [10, 1000],
+
+
+    "rnn":{
+        "cell": ["lstm", "gru"]
+    },
+    
+    "mrnn":{
+        "cell": ["lstm", "gru"]
+    },
+
+    "tcn":{
+        "kernel_size": [2, 7],
+        "dilation": [1, 2],
+        "stride": [1, 2]
+    },
+    "stcn":{
+        "temporal_kernel_size": [2, 7],
+        "spatial_kernel_size": [2, 7],
+        "dilation": [1, 2],
+        "stride": [1, 2]
+    },
+
+    "transformer":{
+        "n_heads": [1, 4],
+        "axis": ["time", "nodes", "both"],
+        "casual": [true, false],
+        "ff_size": [0.1, 1]
+    },
+
+    "stransformer":{
+        "n_heads": [1, 4],
+        "axis": ["time", "nodes", "both"],
+        "casual": [true, false],
+        "ff_size": [0.1, 1]
+    },
+
+    "gcrnn":{
+        "cat_states_layers": [1, 4]
+    }
+} 

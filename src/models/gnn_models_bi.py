@@ -10,7 +10,6 @@ class BaseGNN(nn.Module):
         super().__init__()
         self.edge_index = edge_index
         self.edge_weights = edge_weights
-        self.model = None
 
     def clip_weights(self, clip_value=0.01):
         for p in self.parameters():
