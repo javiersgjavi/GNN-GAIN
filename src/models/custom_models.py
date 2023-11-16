@@ -15,16 +15,17 @@ activations = {
     'sigmoid': nn.Sigmoid,
     'silu': nn.SiLU,
     'selu': nn.SELU,
+    'leaky_relu': nn.LeakyReLU,
 }
 
 encoders = {
     'rnn': RNN,
     #'mrnn': MultiRNN,
-    'tcn': TemporalConvNet,
-    'stcn': SpatioTemporalConvNet,
-    'transformer': Transformer,
-    'stransformer': SpatioTemporalTransformerLayer,
-    'gcrnn': GraphConvRNN
+    'tcn': TemporalConvNet, #falla
+    'stcn': SpatioTemporalConvNet, #falla
+    'transformer': Transformer, #falla
+    'stransformer': SpatioTemporalTransformerLayer, #falla
+    'gcrnn': GraphConvRNN #falla
 }
 
 class UniModel(nn.Module):

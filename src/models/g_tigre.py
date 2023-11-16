@@ -111,7 +111,7 @@ class GTIGRE(pl.LightningModule):
 
         self.use_time_gap = params['use_time_gap_matrix']
         self.generator = model(copy.deepcopy(self.args), time_gap_matrix=self.use_time_gap, gen=True)
-        self.discriminator = model(copy.deepcopy(self.args), time_gap_matrix=self.use_time_gap)
+        self.discriminator = model(copy.deepcopy(self.args), time_gap_matrix=self.use_time_gap, gen=True)
 
         self.hint_generator = HintGenerator(prop_hint=hint_rate)
 
@@ -330,7 +330,7 @@ class GTIGRE(pl.LightningModule):
         outputs = self.return_gan_outputs(batch, train=True)
 
         # Compute the discriminator and generator loss based on the generated outputs
-        d_loss, g_loss = self.ls_loss(outputs)
+        d_loss, g_loss = self.loss(outputs)
 
         # Calculate the mean squared error (MSE) between the real and imputed data
         self.calculate_error_imputation(outputs)

@@ -1,9 +1,9 @@
 {
     "log_learning_rate": [-4, -2],
 
-    "mlp_activation": ["relu", "tanh", "silu"],
-    "encoder_activation": ["relu", "tanh", "silu"],
-    "decoder_activation": ["relu", "tanh", "silu"],
+    "mlp_activation": ["tanh", "silu", "leaky_relu", "sigmoid"],
+    "encoder_activation": ["tanh", "silu", "leaky_relu", "sigmoid" ],
+    "decoder_activation": ["tanh", "silu", "leaky_relu", "sigmoid" ],
 
     "mlp_layers": [1, 4],
     "encoder_layers": [1, 4],
