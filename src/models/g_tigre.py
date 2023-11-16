@@ -1,3 +1,4 @@
+import copy
 import torch
 import numpy as np
 import pytorch_lightning as pl
@@ -101,6 +102,7 @@ class GTIGRE(pl.LightningModule):
             'nodes': self.nodes,
             'edge_index': edge_index,
             'edge_weights': edge_weights,
+            'encoder_name': model_type
         }
 
         self.args = {**args, **params}
@@ -108,8 +110,8 @@ class GTIGRE(pl.LightningModule):
         # Three main components of the GAIN model
 
         self.use_time_gap = params['use_time_gap_matrix']
-        self.generator = model(self.args, time_gap_matrix=self.use_time_gap, gen=True)
-        self.discriminator = model(self.args)
+        self.generator = model(copy.deepcopy(self.args), time_gap_matrix=self.use_time_gap, gen=True)
+        self.discriminator = model(copy.deepcopy(self.args), time_gap_matrix=self.use_time_gap)
 
         self.hint_generator = HintGenerator(prop_hint=hint_rate)
 

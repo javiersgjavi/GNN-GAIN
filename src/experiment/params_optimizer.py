@@ -31,7 +31,7 @@ class RandomSearchLoader:
                 'activation': choice(self.params_grid['encoder_activation'], size=n_iter),
                 'n_layers': randint_close_interval(*self.params_grid['encoder_layers'], size=n_iter),
                 'dropout': uniform(*self.params_grid['encoder_dropout'], size=n_iter),
-                'output': uniform(*self.params_grid['encoder_output'], size=n_iter),
+                'output_size': uniform(*self.params_grid['encoder_output'], size=n_iter),
             },
             'decoder': {
                 'input_size': uniform(*self.params_grid['encoder_output'], size=n_iter),
@@ -39,7 +39,7 @@ class RandomSearchLoader:
                 'activation': choice(self.params_grid['decoder_activation'], size=n_iter),
                 'n_layers': randint_close_interval(*self.params_grid['encoder_layers'], size=n_iter),
                 'dropout': uniform(*self.params_grid['encoder_dropout'], size=n_iter),
-                'cat_states_layers': choice(self.params_grid['gcrnn']['cat_states_layers'], size=n_iter),
+                #'cat_states_layers': choice(self.params_grid['gcrnn']['cat_states_layers'], size=n_iter),
             },
             'mlp':{
                 'hidden_size': uniform(*self.params_grid['mlp_hidden_size'], size=n_iter),
@@ -52,45 +52,53 @@ class RandomSearchLoader:
 
         if self.model_name == 'rnn':
             params_dict['encoder_type'] = ['rnn' for _ in range(n_iter)]
-            params_dict['encoder']['cell'] = choice(self.params_grid_model['rnn']['cell'], size=n_iter)
+            params_dict['encoder']['cell'] = choice(self.params_grid['rnn']['cell'], size=n_iter)
 
         elif self.model_name == 'mrnn':
             params_dict['encoder_type'] = ['mrnn' for _ in range(n_iter)]
-            params_dict['encoder']['cell'] = choice(self.params_grid_model['mrnn']['cell'], size=n_iter)
+            params_dict['encoder']['cell'] = choice(self.params_grid['mrnn']['cell'], size=n_iter)
 
         elif self.model_name == 'tcn':
             params_dict['encoder_type'] = ['tcn' for _ in range(n_iter)]
-            params_dict['encoder']['kernel_size'] = randint_close_interval(*self.params_grid_model['tcn']['kernel_size'], size=n_iter)
-            params_dict['encoder']['dilation'] = randint_close_interval(*self.params_grid_model['tcn']['dilation'], size=n_iter)
-            params_dict['encoder']['stride'] = randint_close_interval(*self.params_grid_model['tcn']['stride'], size=n_iter)
+            params_dict['encoder']['kernel_size'] = randint_close_interval(*self.params_grid['tcn']['kernel_size'], size=n_iter)
+            params_dict['encoder']['dilation'] = randint_close_interval(*self.params_grid['tcn']['dilation'], size=n_iter)
+            params_dict['encoder']['stride'] = randint_close_interval(*self.params_grid['tcn']['stride'], size=n_iter)
 
         elif self.model_name == 'stcn':
             params_dict['encoder_type'] = ['stcn' for _ in range(n_iter)]
-            params_dict['encoder']['temporal_kernel_size'] = randint_close_interval(*self.params_grid_model['stcn']['temporal_kernel_size'], size=n_iter)
-            params_dict['encoder']['spatial_kernel_size'] = randint_close_interval(*self.params_grid_model['stcn']['spatial_kernel_size'], size=n_iter)
-            params_dict['encoder']['dilation'] = randint_close_interval(*self.params_grid_model['stcn']['dilation'], size=n_iter)
-            params_dict['encoder']['stride'] = randint_close_interval(*self.params_grid_model['stcn']['stride'], size=n_iter)
+            params_dict['encoder']['temporal_kernel_size'] = randint_close_interval(*self.params_grid['stcn']['temporal_kernel_size'], size=n_iter)
+            params_dict['encoder']['spatial_kernel_size'] = randint_close_interval(*self.params_grid['stcn']['spatial_kernel_size'], size=n_iter)
+            params_dict['encoder']['dilation'] = randint_close_interval(*self.params_grid['stcn']['dilation'], size=n_iter)
+            params_dict['encoder']['stride'] = randint_close_interval(*self.params_grid['stcn']['stride'], size=n_iter)
 
         elif self.model_name == 'transformer':
             params_dict['encoder_type'] = ['transformer' for _ in range(n_iter)]
-            params_dict['encoder']['n_heads'] = randint_close_interval(*self.params_grid_model['transformer']['n_heads'], size=n_iter)
-            params_dict['encoder']['axis'] = choice(self.params_grid_model['transformer']['axis'], size=n_iter)
-            params_dict['encoder']['casual'] = choice(self.params_grid_model['transformer']['casual'], size=n_iter)
-            params_dict['encoder']['ff_size'] = randint_close_interval(*self.params_grid_model['transformer']['cell'], size=n_iter)
+            params_dict['encoder']['n_heads'] = randint_close_interval(*self.params_grid['transformer']['n_heads'], size=n_iter)
+            params_dict['encoder']['axis'] = choice(self.params_grid['transformer']['axis'], size=n_iter)
+            params_dict['encoder']['casual'] = choice(self.params_grid['transformer']['casual'], size=n_iter)
+            params_dict['encoder']['ff_size'] = randint_close_interval(*self.params_grid['transformer']['cell'], size=n_iter)
 
         elif self.model_name == 'stransformer':
             params_dict['encoder_type'] = ['transformer' for _ in range(n_iter)]
-            params_dict['encoder']['n_heads'] = randint_close_interval(*self.params_grid_model['transformer']['n_heads'], size=n_iter)
-            params_dict['encoder']['axis'] = choice(self.params_grid_model['transformer']['axis'], size=n_iter)
-            params_dict['encoder']['casual'] = choice(self.params_grid_model['transformer']['casual'], size=n_iter)
-            params_dict['encoder']['ff_size'] = randint_close_interval(*self.params_grid_model['transformer']['cell'], size=n_iter)
+            params_dict['encoder']['n_heads'] = randint_close_interval(*self.params_grid['transformer']['n_heads'], size=n_iter)
+            params_dict['encoder']['axis'] = choice(self.params_grid['transformer']['axis'], size=n_iter)
+            params_dict['encoder']['casual'] = choice(self.params_grid['transformer']['casual'], size=n_iter)
+            params_dict['encoder']['ff_size'] = randint_close_interval(*self.params_grid['transformer']['cell'], size=n_iter)
 
         return params_dict
 
     def get_params(self, i):
         if i == self.n_iter:
             raise StopIteration
-        params_iteration = {k: v[i] for k, v in self.random_params.items()}
+        
+        params_iteration = {
+            'learning_rate': self.random_params['learning_rate'][i],
+            'alpha': self.random_params['alpha'][i],
+            'encoder': {k: v[i] for k, v in self.random_params['encoder'].items()},
+            'decoder': {k: v[i] for k, v in self.random_params['decoder'].items()},
+            'mlp': {k: v[i] for k, v in self.random_params['mlp'].items()},
+        }
+        print(params_iteration)
         return params_iteration
 
 

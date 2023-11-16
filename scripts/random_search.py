@@ -66,7 +66,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--models',
         help='models to optimize',
-        default='grugcn,rnngcn',
+        default='rnn,mrnn,tcn,stcn,transformer,stransformer,gcrnn',
         type=str)
     parser.add_argument(
         '--iterations',
@@ -100,7 +100,7 @@ if __name__ == '__main__':
         '--time_gap',
         help='If the model uses the time_gap matrix',
         choices=[0, 1],
-        default='1',
+        default='0',
         type=int)
     parser.add_argument(
         '--folder',

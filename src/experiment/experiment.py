@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from src.models.g_tigre import GTIGRE, GTIGRE_DYNAMIC
-from src.data.datamodule import DataModule, VirtualSensingDataModule
+from src.data.traffic import MetrLADataset, PemsBayDataset
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from torch.optim.lr_scheduler import CosineAnnealingLR
@@ -20,7 +20,7 @@ def print_dict(dictionary, max_iter_train):
 
 class Experiment:
     def __init__(self, model, dataset, iterations, results_path, accelerator='gpu', save_file=None,
-                 max_iter_train=5000, gpu='auto', default_hyperparameters=None, batch_size=None, time_gap=None):
+                 max_iter_train=5000, gpu='auto', default_hyperparameters=None, time_gap=None):
         self.columns = [
             'mae',
             'mse',
@@ -32,6 +32,7 @@ class Experiment:
             'time',
             'params'
         ]
+
 
         if default_hyperparameters is not None:
             default_hyperparameters = default_hyperparameters \
@@ -46,7 +47,6 @@ class Experiment:
 
         else:
             self.time_gap = time_gap
-            self.batch_size = batch_size
 
         self.model_name = model
         self.dataset = dataset
@@ -63,6 +63,7 @@ class Experiment:
         self.exp_name = 'Basic experiment'
 
         self.dm, self.edge_index, self.edge_weights, self.normalizer = self.prepare_data()
+        self.batch_size = self.dm.batch_size
 
     def load_file(self):
 
@@ -77,10 +78,15 @@ class Experiment:
         return results_file
 
     def prepare_data(self):
-        dm = DataModule(dataset=self.dataset, batch_size=self.batch_size, use_time_gap_matrix=self.time_gap)
+        name_dataset = self.dataset.split('_')[0]
+        if name_dataset == 'la':
+            dm = MetrLADataset(point=True)
+        elif name_dataset == 'bay':
+            dm = PemsBayDataset(point=True)
         edge_index, edge_weights = dm.get_connectivity()
         normalizer = dm.get_normalizer()
         dm.setup()
+        print(dm.input_size())
 
         if self.accelerator == 'gpu':
             edge_index = torch.from_numpy(edge_index).to(f'cuda:{self.selected_gpu[0]}')
@@ -330,9 +336,8 @@ class RandomSearchExperiment(Experiment):
     def __init__(self, bi=False, param_loader=None, *args, **kwargs):
         self.bi = bi
         self.params_loader = param_loader
-        batch_size = self.params_loader.random_params['batch_size'][0][0]
 
-        super().__init__(batch_size=batch_size, *args, **kwargs)
+        super().__init__( *args, **kwargs)
 
         self.exp_name = 'Random search experiment'
 

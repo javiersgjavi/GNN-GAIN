@@ -8,10 +8,10 @@ from src.utils import load_time_gap_matrix
 from src.data.splitters import RatioSplitter
 
 class TrafficDataset(DataModule):
-    def __init__(self, point=False, p_fault=None, p_noise=None, use_time_gap_matrix=False, **kwargs):
+    def __init__(self, point=True, p_fault=None, p_noise=None, use_time_gap_matrix=False, **kwargs):
 
         self.dataset_name = f'{self.dataset}_point' if point else f'{self.dataset}_block'
-        self.use_time_gap_matrix = kwargs.get('use_time_gap_matrix')
+        self.use_time_gap_matrix = use_time_gap_matrix
 
         p_fault_base = 0. if point else 0.0015
         p_noise_base = 0.25 if point else 0.05
@@ -36,7 +36,7 @@ class TrafficDataset(DataModule):
             self.time_gap_matrix_f = np.zeros_like(base_data.training_mask)
             self.time_gap_matrix_b = np.zeros_like(base_data.training_mask)
 
-        self.edge_index, self.edge_weights = self.base_data.get_connectivity()
+        self.edge_index, self.edge_weights = base_data.get_connectivity()
 
         self.batch_size=64
         self.base_data = base_data
@@ -60,16 +60,17 @@ class TrafficDataset(DataModule):
 
         super().setup(stage, train, val, test)
 
-
-
-class MetrLA(TrafficDataset):
+    def get_connectivity(self):
+        return self.edge_index, self.edge_weights
+    
+class MetrLADataset(TrafficDataset):
     def __init__(self, **kwargs):
         self.data_class = MetrLA
         self.seed = 9101112
         self.dataset= f'la'
         super().__init__(**kwargs)
 
-class PemsBay(TrafficDataset):
+class PemsBayDataset(TrafficDataset):
     def __init__(self, **kwargs):
         self.data_class = PemsBay
         self.seed = 9101112

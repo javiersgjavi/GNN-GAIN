@@ -3,22 +3,23 @@ from torch import nn
 from typing import Tuple
 
 from tsl.nn.blocks.encoders import TemporalConvNet, SpatioTemporalConvNet, Transformer, SpatioTemporalTransformerLayer
-from tsl.nn.blocks.encoders.recurrent import RNN, MultiRNN, GraphConvRNN
+from tsl.nn.blocks.encoders.recurrent import RNN, GraphConvRNN#, MultiRNN
 from tsl.nn.blocks.decoders import GCNDecoder
 
-from gnn_models_bi import BaseGNN
+from src.models.gnn_models_bi import BaseGNN
 from src.utils import init_weights_xavier, generate_uniform_noise
 
 activations = {
-    'relu': nn.ReLU(),
-    'tanh': nn.Tanh(),
-    'sigmoid': nn.Sigmoid(),
-    'selu': nn.SELU(),
+    'relu': nn.ReLU,
+    'tanh': nn.Tanh,
+    'sigmoid': nn.Sigmoid,
+    'silu': nn.SiLU,
+    'selu': nn.SELU,
 }
 
 encoders = {
     'rnn': RNN,
-    'mrnn': MultiRNN,
+    #'mrnn': MultiRNN,
     'tcn': TemporalConvNet,
     'stcn': SpatioTemporalConvNet,
     'transformer': Transformer,
@@ -37,44 +38,52 @@ class UniModel(nn.Module):
         self.encoder.apply(init_weights_xavier)
         self.decoder.apply(init_weights_xavier)
 
-    def forward(self, x):
+    def forward(self, x, edges, weights):
         x = self.encoder(x)
-        x = self.decoder(x)
+        x = self.decoder(x, edges, weights)
         return x
 
 class BiModel(BaseGNN):
-    def __init__(self, args, time_gap_matrix=False):
+    def __init__(self, args, time_gap_matrix=False, gen=False):
         super().__init__(edge_index=args['edge_index'], edge_weights=args['edge_weights'])
 
+        self.args = args
+        self.gen = gen
         self.time_gap_matrix = time_gap_matrix
         self.output_size_decoder = int(args['periods'] * args['mlp']['hidden_size'])//2
 
-        args['encoder']['input_size'] = 2 if not self.time_gap_matrix else 3
-        args['encoder']['exog_size'] = 0
-        args['encoder']['hidden_size'] = int(args['periods'] * args['encoder']['hidden_size'])
-        args['encoder']['output_size'] = int(args['periods']* args['encoder']['output_size'])
+        
+
+        self.args['encoder']['input_size'] = 2 if not self.time_gap_matrix else 3
+        self.args['encoder']['exog_size'] = 0
+        self.args['encoder']['hidden_size'] = int(args['periods'] * args['encoder']['hidden_size'])
+        self.args['encoder']['output_size'] = int(args['periods']* args['encoder']['output_size'])
 
         
-        args['decoder']['input_size'] = args['encoder']['output_size']
-        args['decoder']['exog_size'] = 0
-        args['decoder']['hidden_size'] = int(args['periods'] * args['decoder']['hidden_size'])
-        args['decoder']['output_size'] = self.output_size_decoder
+        self.args['decoder']['input_size'] = args['encoder']['output_size']
+        self.args['decoder']['hidden_size'] = int(args['periods'] * args['decoder']['hidden_size'])
+        self.args['decoder']['output_size'] = self.output_size_decoder
+        self.args['decoder']['horizon'] = args['periods']
 
-        args['mlp']['input_size'] = self.output_size_decoder*2
+        self.args['mlp']['input_size'] = self.output_size_decoder*2
 
+        self.model_f = UniModel(self.args)
+        self.model_b = UniModel(self.args)
 
-        self.model_f = UniModel(args)
-        self.model_b = UniModel(args)
-        self.define_mlp_decoder(args['mlp'])
+        self.define_mlp_decoder(self.args['mlp'])
+
+        print(self.model_f)
+        print(self.decoder_mlp)
 
     def define_mlp_decoder(self, mlp_params):
         self.decoder_mlp = nn.Sequential()
         mlp_layers = mlp_params['n_layers']
         input_size = mlp_params['input_size']
         activation_fnc = activations[mlp_params['activation']]
+        ouput_size_final = 24
 
         for i, l in enumerate(range(mlp_layers, 1, -1)):
-            output_size = int(((l - 1) *  (self.output_size)/ mlp_layers) + 1)
+            output_size = int(((l - 1) *  (ouput_size_final)/ mlp_layers) + 1)
             output_size = output_size if output_size > 0 else 1
             self.decoder_mlp.add_module(
                 f'linear_{i}',
@@ -83,6 +92,10 @@ class BiModel(BaseGNN):
             self.decoder_mlp.add_module(
                 f'activation_{i}',
                 activation_fnc()
+            )
+            self.decoder_mlp.add_module(
+                f'dropout_{i}',
+                nn.Dropout(mlp_params['dropout'])
             )
             input_size = output_size
 
@@ -101,8 +114,7 @@ class BiModel(BaseGNN):
         output = self.decoder_mlp(h)
         return output
     
-    def forward_g(self, x: torch.Tensor, input_mask: torch.Tensor, time_gap_matrix: torch.Tensor) -> Tuple[
-        Tensor, Tensor]:
+    def forward_g(self, x: torch.Tensor, input_mask: torch.Tensor, time_gap_matrix: torch.Tensor):
         """
         The forward pass of the generator network.
 
