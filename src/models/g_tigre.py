@@ -15,6 +15,10 @@ from src.models.custom_models import BiModel
 from src.utils import loss_d, loss_g, mean_relative_error
 
 
+loss_function = {
+
+}
+
 class HintGenerator:
     """
     Class that generates a hint matrix with the new definition of the hint matrix that can be found in the

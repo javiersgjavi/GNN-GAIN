@@ -40,8 +40,12 @@ class UniModel(nn.Module):
         self.decoder.apply(init_weights_xavier)
 
     def forward(self, x, edges, weights):
+
+        print(f'input shape: {x.shape}')
         x = self.encoder(x)
+        print(f'encoder output shape: {x.shape}')
         x = self.decoder(x, edges, weights)
+        print(f'decoder output shape: {x.shape}\n')
         return x
 
 class BiModel(BaseGNN):
@@ -52,21 +56,8 @@ class BiModel(BaseGNN):
         self.gen = gen
         self.time_gap_matrix = time_gap_matrix
         self.output_size_decoder = int(args['periods'] * args['mlp']['hidden_size'])//2
-
         
-
-        self.args['encoder']['input_size'] = 2 if not self.time_gap_matrix else 3
-        self.args['encoder']['exog_size'] = 0
-        self.args['encoder']['hidden_size'] = int(args['periods'] * args['encoder']['hidden_size'])
-        self.args['encoder']['output_size'] = int(args['periods']* args['encoder']['output_size'])
-
-        
-        self.args['decoder']['input_size'] = args['encoder']['output_size']
-        self.args['decoder']['hidden_size'] = int(args['periods'] * args['decoder']['hidden_size'])
-        self.args['decoder']['output_size'] = self.output_size_decoder
-        self.args['decoder']['horizon'] = args['periods']
-
-        self.args['mlp']['input_size'] = self.output_size_decoder*2
+        self.param_cleaner()
 
         self.model_f = UniModel(self.args)
         self.model_b = UniModel(self.args)
@@ -75,6 +66,37 @@ class BiModel(BaseGNN):
 
         print(self.model_f)
         print(self.decoder_mlp)
+
+    def param_cleaner(self):
+        encoder_name = self.args['encoder_name']
+        in_features = 2 if not self.time_gap_matrix else 3
+
+        
+        
+        self.args['decoder']['hidden_size'] = int(self.args['periods'] * self.args['decoder']['hidden_size'])
+        self.args['decoder']['output_size'] = self.output_size_decoder
+        self.args['decoder']['horizon'] = self.args['periods']
+
+        self.args['mlp']['input_size'] = self.output_size_decoder*2
+
+        if encoder_name == 'rnn':
+            self.args['encoder']['input_size'] = in_features
+            self.args['encoder']['hidden_size'] = int(self.args['periods'] * self.args['encoder']['hidden_size'])
+            self.args['encoder']['output_size'] = int(self.args['periods'] * self.args['encoder']['output_size'])
+            self.args['encoder']['exog_size'] = 0
+
+            self.args['decoder']['input_size'] = self.args['encoder']['output_size']
+
+        elif encoder_name == 'tcn':
+            self.args['encoder']['input_channels'] = in_features
+            self.args['encoder']['hidden_channels'] = int(self.args['periods'] * self.args['encoder']['hidden_channels'])
+            self.args['encoder']['output_channels'] = int(self.args['periods'] * self.args['encoder']['output_channels'])
+
+            self.args['decoder']['input_size'] = self.args['encoder']['output_channels']
+
+        print('------- FINAL ARGS -------')
+        for k, v in self.args.items():
+            print(f'{k}: {v}')
 
     def define_mlp_decoder(self, mlp_params):
         self.decoder_mlp = nn.Sequential()
@@ -108,11 +130,14 @@ class BiModel(BaseGNN):
    
 
     def bi_forward(self, input_tensor_f, input_tensor_b, edges, weights):
+        print('Forward --------------------------\n')
         f_representation = self.model_f(input_tensor_f, edges, weights)
         b_representation = self.model_b(input_tensor_b, edges, weights)
 
         h = torch.cat([f_representation, torch.flip(b_representation, dims=[1])], dim=-1)
+        print(f'concatenated shape: {h.shape}')
         output = self.decoder_mlp(h)
+        print(f'output shape: {output.shape}\n')
         return output
     
     def forward_g(self, x: torch.Tensor, input_mask: torch.Tensor, time_gap_matrix: torch.Tensor):
@@ -128,6 +153,7 @@ class BiModel(BaseGNN):
             torch.Tensor: The imputed tensor.
 
         """
+        print('GENERATOR --------------------------\n')
         noise_matrix = generate_uniform_noise(tensor_like=x)
 
         # Concatenate the input tensor with the noise matrix
@@ -157,6 +183,7 @@ class BiModel(BaseGNN):
             torch.Tensor: The output tensor of the discriminator network.
 
         """
+        print('DISCRIMINATOR --------------------------\n')
         input_tensor_f = torch.stack([x, hint_matrix]).permute(1, 2, 3, 0)
         input_tensor_b = torch.flip(input_tensor_f, dims=[1])
         pred = self.bi_forward(input_tensor_f, input_tensor_b, self.edge_index, self.edge_weights).squeeze(dim=-1)

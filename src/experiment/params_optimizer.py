@@ -24,20 +24,17 @@ class RandomSearchLoader:
 
     def load_params_grid(self, n_iter):
         params_dict = {
+            'loss': [choice(self.params_grid['loss']) for _ in range(n_iter)],
             'learning_rate': 10 ** uniform(*self.params_grid['log_learning_rate'], size=n_iter),
             'alpha': [100 for _ in range(n_iter)], #'alpha': uniform(*self.params_grid['alpha'], size=n_iter).astype(int),
             'encoder': {
-                'hidden_size': uniform(*self.params_grid['encoder_hidden_size'], size=n_iter),
                 'activation': choice(self.params_grid['encoder_activation'], size=n_iter),
-                'n_layers': randint_close_interval(*self.params_grid['encoder_layers'], size=n_iter),
-                'dropout': uniform(*self.params_grid['encoder_dropout'], size=n_iter),
-                'output_size': uniform(*self.params_grid['encoder_output'], size=n_iter),
+                'dropout': uniform(*self.params_grid['encoder_dropout'], size=n_iter)
             },
             'decoder': {
-                'input_size': uniform(*self.params_grid['encoder_output'], size=n_iter),
                 'hidden_size': uniform(*self.params_grid['decoder_hidden_size'], size=n_iter),
                 'activation': choice(self.params_grid['decoder_activation'], size=n_iter),
-                'n_layers': randint_close_interval(*self.params_grid['encoder_layers'], size=n_iter),
+                'n_layers': randint_close_interval(*self.params_grid['decoder_layers'], size=n_iter),
                 'dropout': uniform(*self.params_grid['encoder_dropout'], size=n_iter),
                 #'cat_states_layers': choice(self.params_grid['gcrnn']['cat_states_layers'], size=n_iter),
             },
@@ -52,24 +49,41 @@ class RandomSearchLoader:
 
         if self.model_name == 'rnn':
             params_dict['encoder_type'] = ['rnn' for _ in range(n_iter)]
+            params_dict['encoder']['n_layers'] = randint_close_interval(*self.params_grid['rnn']['encoder_layers'], size=n_iter)
             params_dict['encoder']['cell'] = choice(self.params_grid['rnn']['cell'], size=n_iter)
+            params_dict['encoder']['hidden_size'] = uniform(*self.params_grid['rnn']['hidden_size'], size=n_iter)
+            params_dict['encoder']['output_size'] = uniform(*self.params_grid['encoder_output'], size=n_iter)
 
+    
         elif self.model_name == 'mrnn':
             params_dict['encoder_type'] = ['mrnn' for _ in range(n_iter)]
+            params_dict['encoder']['n_layers'] = randint_close_interval(*self.params_grid['mrnn']['encoder_layers'], size=n_iter)
             params_dict['encoder']['cell'] = choice(self.params_grid['mrnn']['cell'], size=n_iter)
+            params_dict['encoder']['hidden_size'] = uniform(*self.params_grid['mrnn']['hidden_size'], size=n_iter)
+            params_dict['encoder']['output_size'] = uniform(*self.params_grid['encoder_output'], size=n_iter)
+
 
         elif self.model_name == 'tcn':
             params_dict['encoder_type'] = ['tcn' for _ in range(n_iter)]
+            params_dict['encoder']['n_layers'] = randint_close_interval(*self.params_grid['tcn']['encoder_layers'], size=n_iter)
             params_dict['encoder']['kernel_size'] = randint_close_interval(*self.params_grid['tcn']['kernel_size'], size=n_iter)
             params_dict['encoder']['dilation'] = randint_close_interval(*self.params_grid['tcn']['dilation'], size=n_iter)
-            params_dict['encoder']['stride'] = randint_close_interval(*self.params_grid['tcn']['stride'], size=n_iter)
+            params_dict['encoder']['hidden_channels'] = uniform(*self.params_grid['tcn']['encoder_channels'], size=n_iter)
+            params_dict['encoder']['output_channels'] = uniform(*self.params_grid['encoder_output'], size=n_iter)
+            params_dict['encoder']['weight_norm'] = choice(self.params_grid['tcn']['weight_norm'], size=n_iter)
+
 
         elif self.model_name == 'stcn':
             params_dict['encoder_type'] = ['stcn' for _ in range(n_iter)]
+            params_dict['encoder']['temporal_convs'] = choice(self.params_grid['stcn']['temporal_convs'], size=n_iter)
             params_dict['encoder']['temporal_kernel_size'] = randint_close_interval(*self.params_grid['stcn']['temporal_kernel_size'], size=n_iter)
+            params_dict['encoder']['spatial_convs'] = choice(self.params_grid['stcn']['spatial_convs'], size=n_iter)
             params_dict['encoder']['spatial_kernel_size'] = randint_close_interval(*self.params_grid['stcn']['spatial_kernel_size'], size=n_iter)
             params_dict['encoder']['dilation'] = randint_close_interval(*self.params_grid['stcn']['dilation'], size=n_iter)
-            params_dict['encoder']['stride'] = randint_close_interval(*self.params_grid['stcn']['stride'], size=n_iter)
+            params_dict['encoder']['output_channels'] = uniform(*self.params_grid['encoder_output'], size=n_iter)
+            params_dict['encoder']['gated'] = choice(self.params_grid['stcn']['gated'], size=n_iter)
+
+
 
         elif self.model_name == 'transformer':
             params_dict['encoder_type'] = ['transformer' for _ in range(n_iter)]
@@ -98,7 +112,6 @@ class RandomSearchLoader:
             'decoder': {k: v[i] for k, v in self.random_params['decoder'].items()},
             'mlp': {k: v[i] for k, v in self.random_params['mlp'].items()},
         }
-        print(params_iteration)
         return params_iteration
 
 

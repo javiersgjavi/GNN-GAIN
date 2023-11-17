@@ -1,4 +1,5 @@
 {
+    "loss": ["gan", "ls"],
     "log_learning_rate": [-4, -2],
 
     "mlp_activation": ["tanh", "silu", "leaky_relu", "sigmoid"],
@@ -6,14 +7,13 @@
     "decoder_activation": ["tanh", "silu", "leaky_relu", "sigmoid" ],
 
     "mlp_layers": [1, 4],
-    "encoder_layers": [1, 4],
     "decoder_layers": [1, 4],
 
     "mlp_hidden_size":[0.1, 1],
-    "encoder_hidden_size":[0.5, 1.5],
     "decoder_hidden_size":[0.5, 1.5],
 
     "encoder_output": [0.5, 1.5],
+
 
     "mlp_dropout": [0, 0.5],
     "encoder_dropout": [0, 0.5],
@@ -22,23 +22,30 @@
     "alpha": [10, 1000],
 
     "rnn":{
-        "cell": ["lstm", "gru"]
+        "cell": ["lstm", "gru"],
+        "encoder_layers": [1, 4],
+        "hidden_size":[0.5, 1.5]
     },
-
     "mrnn":{
-        "cell": ["lstm", "gru"]
+        "cell": ["lstm", "gru"],
+        "hidden_size":[0.5, 1.5],
+        "encoder_layers": [1, 4]
     },
-
     "tcn":{
         "kernel_size": [2, 7],
         "dilation": [1, 2],
-        "stride": [1, 2]
+        "stride": [1, 2],
+        "encoder_channels": [0.5, 1.5],
+        "weight_norm": [true, false],
+        "encoder_layers": [1, 4]
     },
     "stcn":{
         "temporal_kernel_size": [2, 7],
         "spatial_kernel_size": [2, 7],
         "dilation": [1, 3],
-        "stride": [1, 3]
+        "temporal_convs": [1, 4],
+        "spatial_convs": [1, 4],
+        "gated": [true, false]
     },
 
     "transformer":{
