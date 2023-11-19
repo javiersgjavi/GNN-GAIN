@@ -31,6 +31,7 @@ encoders = {
 class UniModel(nn.Module):
     def __init__(self, hyperparameters):
         super().__init__()
+        self.name = hyperparameters['encoder_name']
 
         self.encoder = encoders[hyperparameters['encoder_name']](**hyperparameters['encoder'])
         
@@ -42,7 +43,7 @@ class UniModel(nn.Module):
     def forward(self, x, edges, weights):
 
         print(f'input shape: {x.shape}')
-        x = self.encoder(x)
+        x = self.encoder(x) if self.name != 'stcn' else self.encoder(x, edges, weights)
         print(f'encoder output shape: {x.shape}')
         x = self.decoder(x, edges, weights)
         print(f'decoder output shape: {x.shape}\n')
@@ -93,6 +94,13 @@ class BiModel(BaseGNN):
             self.args['encoder']['output_channels'] = int(self.args['periods'] * self.args['encoder']['output_channels'])
 
             self.args['decoder']['input_size'] = self.args['encoder']['output_channels']
+
+        elif encoder_name == 'stcn':
+            self.args['encoder']['input_size'] = in_features
+            #self.args['encoder']['hidden_size'] = int(self.args['periods'] * self.args['encoder']['hidden_size'])
+            self.args['encoder']['output_size'] = int(self.args['periods'] * self.args['encoder']['output_size'])
+
+            self.args['decoder']['input_size'] = self.args['encoder']['output_size']
 
         print('------- FINAL ARGS -------')
         for k, v in self.args.items():

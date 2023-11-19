@@ -80,7 +80,7 @@ class RandomSearchLoader:
             params_dict['encoder']['spatial_convs'] = choice(self.params_grid['stcn']['spatial_convs'], size=n_iter)
             params_dict['encoder']['spatial_kernel_size'] = randint_close_interval(*self.params_grid['stcn']['spatial_kernel_size'], size=n_iter)
             params_dict['encoder']['dilation'] = randint_close_interval(*self.params_grid['stcn']['dilation'], size=n_iter)
-            params_dict['encoder']['output_channels'] = uniform(*self.params_grid['encoder_output'], size=n_iter)
+            params_dict['encoder']['output_size'] = uniform(*self.params_grid['encoder_output'], size=n_iter)
             params_dict['encoder']['gated'] = choice(self.params_grid['stcn']['gated'], size=n_iter)
 
 
