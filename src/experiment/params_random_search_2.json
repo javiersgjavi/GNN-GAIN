@@ -1,5 +1,5 @@
 {
-    "loss": ["gan", "ls"],
+    "loss": ["base", "ls"],
     "log_learning_rate": [-4, -2],
 
     "mlp_activation": ["tanh", "silu", "leaky_relu", "sigmoid"],

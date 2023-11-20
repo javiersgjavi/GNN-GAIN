@@ -15,7 +15,9 @@ from src.models.custom_models import BiModel
 from src.utils import loss_d, loss_g, mean_relative_error
 
 
-loss_function = {
+losses = {
+    'base': None,
+    'ls': None
 
 }
 
@@ -122,6 +124,8 @@ class GTIGRE(pl.LightningModule):
         self.ablation_gan = ablation_gan
         self.ablation_reconstruction = ablation_reconstruction
         self.ablation_loop = ablation_loop
+
+        self.loss_fn = losses[self.args['loss_fn']]
 
         self.d_i = 0
     # -------------------- Custom methods --------------------
@@ -334,7 +338,7 @@ class GTIGRE(pl.LightningModule):
         outputs = self.return_gan_outputs(batch, train=True)
 
         # Compute the discriminator and generator loss based on the generated outputs
-        d_loss, g_loss = self.loss(outputs)
+        d_loss, g_loss = self.loss_fn(outputs)
 
         # Calculate the mean squared error (MSE) between the real and imputed data
         self.calculate_error_imputation(outputs)

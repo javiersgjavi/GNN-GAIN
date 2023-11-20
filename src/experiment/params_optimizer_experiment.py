@@ -1,19 +1,21 @@
 import json
 import itertools
 import pandas as pd
+from tqdm import tqdm
 from numpy.random import randint, uniform, choice
-from src.experiment.experiment import RandomSearchExperiment
+from src.experiment.base_experiment import BaseExperiment, print_dict
 
 
 def randint_close_interval(low, high, size=None):
     return randint(low, high + 1, size=size)
 
 
-class RandomSearchLoader:
-    def __init__(self, model_name, n_iter, bi=False):
+class RandomSearchParamLoader:
+    def __init__(self, model_name, n_iter, bi=False, loss_fn=None):
         self.n_iter = n_iter
         self.model_name = model_name
         self.bi = bi
+        self.loss_fn = loss_fn
 
         file = 'params_random_search_2.json'
 
@@ -24,7 +26,7 @@ class RandomSearchLoader:
 
     def load_params_grid(self, n_iter):
         params_dict = {
-            'loss': [choice(self.params_grid['loss']) for _ in range(n_iter)],
+            'loss': [self.loss_fn if self.loss_fn is not None else choice(self.params_grid['loss']) for _ in range(n_iter)],
             'learning_rate': 10 ** uniform(*self.params_grid['log_learning_rate'], size=n_iter),
             'alpha': [100 for _ in range(n_iter)], #'alpha': uniform(*self.params_grid['alpha'], size=n_iter).astype(int),
             'encoder': {
@@ -115,11 +117,32 @@ class RandomSearchLoader:
         }
         return params_iteration
 
+class RandomSearchExperiment(BaseExperiment):
+    def __init__(self, bi=False, param_loader=None, *args, **kwargs):
+        self.bi = bi
+        self.params_loader = param_loader
+
+        super().__init__( *args, **kwargs)
+
+        self.exp_name = 'Random search experiment'
+
+    def train_test(self, hyperparameters):
+        hyperparameters['use_time_gap_matrix'] = self.time_gap
+        hyperparameters['bi'] = self.bi
+        return super().train_test(hyperparameters)
+
+    def run(self):
+        for i in tqdm(range(self.results_file.shape[0], self.iterations),
+                      desc=f'{self.exp_name} with {self.model_name} in {self.dataset}'):
+            hyperparameters = self.params_loader.get_params(i)
+            print_dict(hyperparameters, self.max_iter_train)
+            results = self.train_test(hyperparameters)
+            self.save_results_file(results, hyperparameters)
 
 class RandomSearch:
 
     def __init__(self, models=None, datasets=None, iterations=100, gpu='auto', max_iter_train=5000, bi=None,
-                 time_gap=None, folder='results'):
+                 time_gap=None, folder='results', loss_fn=None):
 
         self.columns = [
             'mae',
@@ -142,6 +165,7 @@ class RandomSearch:
         self.max_iter_train = max_iter_train
         self.bi = bi
         self.time_gap = time_gap
+        self.loss_fn = loss_fn
 
     def make_summary_dataset(self, datasets, models):
         columns = ['model'] + self.columns
@@ -198,7 +222,7 @@ class RandomSearch:
         for dataset, model in itertools.product(self.datasets, self.models):
             results_path = f'./{self.folder}/{dataset}/'
 
-            param_loader = RandomSearchLoader(model, self.iterations, self.bi)
+            param_loader = RandomSearchParamLoader(model, self.iterations, self.bi, self.loss_fn)
             
             random_search = RandomSearchExperiment(
                 model=model,
@@ -216,3 +240,5 @@ class RandomSearch:
             random_search.run()
         self.make_summary_dataset(self.datasets, self.models)
         self.make_summary_general(self.datasets)
+
+

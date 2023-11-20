@@ -3,7 +3,7 @@ import sys
 sys.path.append('./')
 import argparse
 import itertools
-from src.experiment.params_optimizer import RandomSearch
+from src.experiment.params_optimizer_experiment import RandomSearch
 
 
 def main(args):
@@ -18,6 +18,8 @@ def main(args):
 
     imputation_problem = args.imputation_problem
     scenario = args.scenario
+
+    loss_fn = args.loss
 
     if (imputation_problem is not None) and (scenario is not None):
         raise ValueError('Scenario or imputation problem must be specified, not both')
@@ -49,7 +51,8 @@ def main(args):
         max_iter_train=5000,
         bi=bi,
         time_gap=time_gap,
-        folder=folder
+        folder=folder,
+        loss_fn=loss_fn
     )
 
     random_search.run()
@@ -110,6 +113,11 @@ if __name__ == '__main__':
         '--prop_missing',
         help='Proportion of missing values to test with electric dataset',
         default='0.25', )
+    parser.add_argument(
+        '--loss',
+        help='Loss function to use',
+        choices=['base', 'ls', None],
+    )
 
     args = parser.parse_args()
 
