@@ -14,7 +14,6 @@
 
     "encoder_output": [0.5, 1.5],
 
-
     "mlp_dropout": [0, 0.5],
     "encoder_dropout": [0, 0.5],
     "decoder_dropout": [0, 0.5],
@@ -50,14 +49,14 @@
 
     "transformer":{
         "n_heads": [1, 4],
-        "axis": ["time", "nodes", "both"],
-        "casual": [true, false],
-        "ff_size": [0.1, 1]
+        "causal": [true, false],
+        "ff_size": [0.1, 1],
+        "hidden_size":[0.5, 1.5],
+        "n_layers": [1, 4]
     },
 
     "stransformer":{
         "n_heads": [1, 4],
-        "axis": ["time", "nodes", "both"],
         "casual": [true, false],
         "ff_size": [0.1, 1]
     },

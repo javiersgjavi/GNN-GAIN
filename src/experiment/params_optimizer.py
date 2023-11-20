@@ -72,7 +72,6 @@ class RandomSearchLoader:
             params_dict['encoder']['output_channels'] = uniform(*self.params_grid['encoder_output'], size=n_iter)
             params_dict['encoder']['weight_norm'] = choice(self.params_grid['tcn']['weight_norm'], size=n_iter)
 
-
         elif self.model_name == 'stcn':
             params_dict['encoder_type'] = ['stcn' for _ in range(n_iter)]
             params_dict['encoder']['temporal_convs'] = choice(self.params_grid['stcn']['temporal_convs'], size=n_iter)
@@ -83,14 +82,16 @@ class RandomSearchLoader:
             params_dict['encoder']['output_size'] = uniform(*self.params_grid['encoder_output'], size=n_iter)
             params_dict['encoder']['gated'] = choice(self.params_grid['stcn']['gated'], size=n_iter)
 
-
-
         elif self.model_name == 'transformer':
             params_dict['encoder_type'] = ['transformer' for _ in range(n_iter)]
             params_dict['encoder']['n_heads'] = randint_close_interval(*self.params_grid['transformer']['n_heads'], size=n_iter)
-            params_dict['encoder']['axis'] = choice(self.params_grid['transformer']['axis'], size=n_iter)
-            params_dict['encoder']['casual'] = choice(self.params_grid['transformer']['casual'], size=n_iter)
-            params_dict['encoder']['ff_size'] = randint_close_interval(*self.params_grid['transformer']['cell'], size=n_iter)
+            params_dict['encoder']['causal'] = choice(self.params_grid['transformer']['causal'], size=n_iter)
+            params_dict['encoder']['ff_size'] = randint_close_interval(*self.params_grid['transformer']['ff_size'], size=n_iter)
+            params_dict['encoder']['hidden_size'] = uniform(*self.params_grid['transformer']['hidden_size'], size=n_iter)
+            params_dict['encoder']['output_size'] = uniform(*self.params_grid['encoder_output'], size=n_iter)
+            params_dict['encoder']['activation'] = choice(self.params_grid['encoder_activation'], size=n_iter)
+            params_dict['encoder']['n_layers'] = randint_close_interval(*self.params_grid['transformer']['n_layers'], size=n_iter)
+            params_dict['encoder']['axis'] = ['time' for _ in range(n_iter)]
 
         elif self.model_name == 'stransformer':
             params_dict['encoder_type'] = ['transformer' for _ in range(n_iter)]

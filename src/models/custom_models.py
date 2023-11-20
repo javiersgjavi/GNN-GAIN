@@ -7,7 +7,7 @@ from tsl.nn.blocks.encoders.recurrent import RNN, GraphConvRNN#, MultiRNN
 from tsl.nn.blocks.decoders import GCNDecoder
 
 from src.models.gnn_models_bi import BaseGNN
-from src.utils import init_weights_xavier, generate_uniform_noise
+from src.utils import init_weights_xavier, generate_uniform_noise, round_to_nearest_divisible
 
 activations = {
     'relu': nn.ReLU,
@@ -21,8 +21,8 @@ activations = {
 encoders = {
     'rnn': RNN,
     #'mrnn': MultiRNN,
-    'tcn': TemporalConvNet, #falla
-    'stcn': SpatioTemporalConvNet, #falla
+    'tcn': TemporalConvNet, 
+    'stcn': SpatioTemporalConvNet, 
     'transformer': Transformer, #falla
     'stransformer': SpatioTemporalTransformerLayer, #falla
     'gcrnn': GraphConvRNN #falla
@@ -97,7 +97,16 @@ class BiModel(BaseGNN):
 
         elif encoder_name == 'stcn':
             self.args['encoder']['input_size'] = in_features
-            #self.args['encoder']['hidden_size'] = int(self.args['periods'] * self.args['encoder']['hidden_size'])
+            self.args['encoder']['output_size'] = int(self.args['periods'] * self.args['encoder']['output_size'])
+
+            self.args['decoder']['input_size'] = self.args['encoder']['output_size']
+
+        elif encoder_name == 'transformer':
+            self.args['encoder']['input_size'] = in_features
+            hidden_size = int(self.args['periods'] * self.args['encoder']['hidden_size'])
+            self.args['encoder']['hidden_size'] = round_to_nearest_divisible(hidden_size, self.args['encoder']['n_heads'])
+
+            self.args['encoder']['ff_size'] = int(self.args['periods'] * self.args['encoder']['ff_size'])
             self.args['encoder']['output_size'] = int(self.args['periods'] * self.args['encoder']['output_size'])
 
             self.args['decoder']['input_size'] = self.args['encoder']['output_size']
