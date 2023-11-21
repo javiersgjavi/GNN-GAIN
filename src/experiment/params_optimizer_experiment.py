@@ -26,7 +26,7 @@ class RandomSearchParamLoader:
 
     def load_params_grid(self, n_iter):
         params_dict = {
-            'loss': [self.loss_fn if self.loss_fn is not None else choice(self.params_grid['loss']) for _ in range(n_iter)],
+            'loss_fn': [self.loss_fn if self.loss_fn is not None else choice(self.params_grid['loss']) for _ in range(n_iter)],
             'learning_rate': 10 ** uniform(*self.params_grid['log_learning_rate'], size=n_iter),
             'alpha': [100 for _ in range(n_iter)], #'alpha': uniform(*self.params_grid['alpha'], size=n_iter).astype(int),
             'encoder': {
@@ -109,6 +109,7 @@ class RandomSearchParamLoader:
             raise StopIteration
         
         params_iteration = {
+            'loss_fn': self.random_params['loss_fn'][i],
             'learning_rate': self.random_params['learning_rate'][i],
             'alpha': self.random_params['alpha'][i],
             'encoder': {k: v[i] for k, v in self.random_params['encoder'].items()},

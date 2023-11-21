@@ -121,34 +121,6 @@ def load_time_gap_matrix(base_data, path):
 
     return time_gap_matrix_f, time_gap_matrix_b[::-1, :]
 
-
-def loss_d(d_prob: torch.Tensor, m: torch.Tensor) -> torch.Tensor:
-    """
-    Compute the discriminator loss.
-
-    Args:
-        d_prob (torch.Tensor): Discriminator output probabilities
-        m (torch.Tensor): Mask tensor indicating the location of missing values
-
-    Returns:
-        torch.Tensor: Discriminator loss
-    """
-    return -torch.mean(m * torch.log(d_prob + 1e-8) + (1 - m) * torch.log(1. - d_prob + 1e-8))
-
-
-def loss_g(d_prob: torch.Tensor, m: torch.Tensor) -> torch.Tensor:
-    """
-    Compute the generator loss.
-
-    Args:
-        d_prob (torch.Tensor): Discriminator output probabilities
-        m (torch.Tensor): Mask tensor indicating the location of missing values
-
-    Returns:
-        torch.Tensor: Generator loss
-    """
-    return -torch.mean((1 - m) * torch.log(d_prob + 1e-8))
-
 def add_sn(m):    
     if isinstance(m, (nn.Linear)):
         return nn.utils.spectral_norm(m)
