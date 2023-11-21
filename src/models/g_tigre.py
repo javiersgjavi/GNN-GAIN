@@ -1,3 +1,4 @@
+import copy
 import torch
 import numpy as np
 import pytorch_lightning as pl
@@ -9,9 +10,10 @@ import torch.autograd as autograd
 
 from src.models.gnn_models import GRUGCN, RNNEncGCNDec
 from src.models.gnn_models_bi import GRUGCNBI, RNNEncGCNDecBI
+from src.models.custom_models import BiModel
+from src.models.losses import BaseGANLoss, LSGANLoss, WSGANLoss
 
-from src.utils import loss_d, loss_g, mean_relative_error
-
+from src.utils import mean_relative_error
 
 class HintGenerator:
     """
@@ -50,8 +52,7 @@ class HintGenerator:
         hint_matrix.to(input_mask.device)
 
         return hint_matrix
-
-
+    
 class GTIGRE(pl.LightningModule):
     def __init__(self, input_size: tuple, edge_index, edge_weights, normalizer, model_type: str = None,
                  hint_rate: float = 0.9, alpha: float = 100, params: Dict = None,
@@ -76,19 +77,16 @@ class GTIGRE(pl.LightningModule):
         super().__init__()
         super().save_hyperparameters()
 
-        model_class = {
-            'grugcn': GRUGCN,
-            'rnngcn': RNNEncGCNDec,
+
+        losses = {
+            'base': BaseGANLoss,
+            'ls': LSGANLoss,
+            'ws': WSGANLoss
         }
 
-        model_class_bi = {
-            'grugcn': GRUGCNBI,
-            'rnngcn': RNNEncGCNDecBI,
-        }
+        #model = model_class_bi[model_type] if params['bi'] else model_class[model_type]
+        model = BiModel
 
-        model = model_class_bi[model_type] if params['bi'] else model_class[model_type]
-
-        self.alpha = alpha if alpha is not None else 100
         self.nodes = input_size[1]
         self.normalizer = normalizer
         self.loss_mse = torch.nn.MSELoss()
@@ -99,6 +97,7 @@ class GTIGRE(pl.LightningModule):
             'nodes': self.nodes,
             'edge_index': edge_index,
             'edge_weights': edge_weights,
+            'encoder_name': model_type
         }
 
         self.args = {**args, **params}
@@ -106,14 +105,18 @@ class GTIGRE(pl.LightningModule):
         # Three main components of the GAIN model
 
         self.use_time_gap = params['use_time_gap_matrix']
-        self.generator = model(self.args, time_gap_matrix=self.use_time_gap, gen=True)
-        self.discriminator = model(self.args)
+        self.generator = model(copy.deepcopy(self.args), time_gap_matrix=self.use_time_gap, gen=True)
+        self.discriminator = model(copy.deepcopy(self.args), time_gap_matrix=self.use_time_gap, gen=True)
 
         self.hint_generator = HintGenerator(prop_hint=hint_rate)
 
-        self.ablation_gan = ablation_gan
-        self.ablation_reconstruction = ablation_reconstruction
         self.ablation_loop = ablation_loop
+
+        self.loss_fn = losses[self.args['loss_fn']](
+            alpha=alpha if alpha is not None else 100,
+            ablation_gan=ablation_gan,
+            ablation_reconstruction=ablation_reconstruction
+        )
 
         self.d_i = 0
     # -------------------- Custom methods --------------------
@@ -127,6 +130,7 @@ class GTIGRE(pl.LightningModule):
                 outputs: A dictionary containing the output tensors for a batch.
                 type_step: A string indicating whether the batch is for training or validation (default is 'train').
             """
+        info = {}
         x_real_norm = outputs['x_real']
         x_fake_norm = outputs['x_fake']
         known_values = outputs['known_values']
@@ -137,12 +141,11 @@ class GTIGRE(pl.LightningModule):
         mse_norm = self.loss_mse(fake_norm, real_norm)
         mae_norm = self.mae(fake_norm, real_norm)
 
-        self.log('mse', mse_norm, prog_bar=True)
-        self.log('rmse', torch.sqrt(mse_norm), prog_bar=True)
-        self.log('mae', mae_norm)
-        self.logger.experiment.add_scalars('mse_graph', {type_step: mse_norm}, self.global_step)
+        info['mse'] = mse_norm
+        info['rmse'] = torch.sqrt(mse_norm)
+        info['mae'] = mae_norm
 
-        if type_step == 'val' or type_step == 'test':
+        if type_step != 'train':
             x_real_denorm = self.normalizer.inverse_transform(x_real_norm.reshape(-1, self.nodes).detach().cpu())
             x_fake_denorm = self.normalizer.inverse_transform(x_fake_norm.reshape(-1, self.nodes).detach().cpu())
 
@@ -153,77 +156,31 @@ class GTIGRE(pl.LightningModule):
             mae_denorm = mean_absolute_error(real_denorm, fake_denorm)
             mre_denorm = mean_relative_error(real_denorm, fake_denorm)
 
-            self.log('denorm_rmse', np.sqrt(mse_denorm))
-            self.log('denorm_mae', mae_denorm)
-            self.log('denorm_mse', mse_denorm)
-            self.log('denorm_mre', mre_denorm)
+            info['denorm_rmse'] = np.sqrt(mse_denorm)
+            info['denorm_mae'] = mae_denorm
+            info['denorm_mse'] = mse_denorm
+            info['denorm_mre'] = mre_denorm
 
-    def ls_loss(self, outputs):
-        d_pred = outputs['d_pred']
-        mask_real_samples = outputs['input_mask_bool']
-        real_samples = outputs['x_real'][mask_real_samples]
-        imputated_real_samples = outputs['imputation'][mask_real_samples]
+        return info
+    
+    def log_results(self, info, type_step='train'):
 
-        critic_real = d_pred[mask_real_samples]
-        critic_fake = d_pred[~mask_real_samples]
-        
-        real_loss = self.loss_mse(critic_real, torch.ones_like(critic_real))
-        fake_loss = self.loss_mse(critic_fake, torch.zeros_like(critic_fake)) 
-        d_loss = 0.5*(real_loss + fake_loss)
-        
-        reconstruction_loss = self.loss_mse(imputated_real_samples, real_samples)
-        adversarial_loss = self.loss_mse(critic_fake, torch.ones_like(critic_fake))
-        g_loss = 0.5*adversarial_loss + self.alpha*reconstruction_loss
+        imputation_info = info['imputation']
 
-        log_dict = {'Generator': adversarial_loss, 'Discriminator': d_loss}
-        self.logger.experiment.add_scalars(f'G VS D (fake)', log_dict, self.global_step)
-        self.log('G_loss_reconstruction', reconstruction_loss)
+        self.log('mse', imputation_info['mse'], prog_bar=True)
+        self.log('rmse', imputation_info['rmse'], prog_bar=True)
+        self.log('mae', imputation_info['mae'])
+        self.logger.experiment.add_scalars('mse_graph', {type_step: imputation_info['mse']}, self.global_step)
 
-        return d_loss, g_loss
+        if type_step == 'train':
+            self.logger.experiment.add_scalars(f"G VS D (fake)", info['adv_losses'], self.global_step)
+            self.log("G_loss_reconstruction", info['rec_loss'])
+        else:
+            self.log('denorm_rmse', imputation_info['denorm_rmse'])
+            self.log('denorm_mae', imputation_info['denorm_mae'])
+            self.log('denorm_mse', imputation_info['denorm_mse'])
+            self.log('denorm_mre', imputation_info['denorm_mre'])
 
-
-
-    def loss(self, outputs: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-            Calculates the loss of the generator and discriminator. The losses are calculated with the
-            new method described in the original repository. With the new hint matrix definition, the
-            losses are calculated with all the known values and the values to be determined by the discriminator.
-
-            Args:
-                outputs: A dictionary containing the output tensors for a batch.
-
-            Returns:
-                A tuple containing the discriminator loss and generator loss, respectively.
-            """
-        d_pred = outputs['d_pred']
-        x_real = outputs['x_real']
-        imputation = outputs['imputation']
-        input_mask_int = outputs['input_mask_int']
-        input_mask_bool = outputs['input_mask_bool']
-
-        # --------------------- Discriminator loss ---------------------
-        d_loss = loss_d(d_pred, input_mask_int) if not self.ablation_gan else torch.zeros(1, device=d_pred.device,
-                                                                                          requires_grad=True)
-
-        # --------------------- Generator loss -------------------------
-        g_loss_adversarial = loss_g(d_pred, input_mask_int) if not self.ablation_gan else torch.zeros(1,
-                                                                                                      device=d_pred.device,
-                                                                                                      requires_grad=True)
-
-        g_loss_reconstruction = self.loss_mse(
-            imputation[input_mask_bool],
-            x_real[input_mask_bool]
-            ) if not self.ablation_reconstruction else torch.zeros(1, device=d_pred.device, requires_grad=True)
-
-        g_loss = g_loss_adversarial + self.alpha * g_loss_reconstruction
-
-        # ---------------------------------------------------------------
-
-        log_dict = {'Generator': g_loss_adversarial, 'Discriminator': d_loss}
-        self.logger.experiment.add_scalars(f'G VS D (fake)', log_dict, self.global_step)
-        self.log('G_loss_reconstruction', g_loss_reconstruction)
-
-        return d_loss, g_loss
 
     def return_gan_outputs(self, batch: Tuple, train=False) -> Dict[str, torch.Tensor]:
         """
@@ -294,8 +251,8 @@ class GTIGRE(pl.LightningModule):
         """
             Configure the optimizers for the GAN model.
         """
-        opt_d = torch.optim.Adam(self.discriminator.parameters(), lr=self.args['learning_rate'], weight_decay=0)
-        opt_g = torch.optim.Adam(self.generator.parameters(), lr=self.args['learning_rate'], weight_decay=0)
+        opt_d = torch.optim.Adam(self.discriminator.parameters(), lr=self.args['learning_rate'], weight_decay=1e-5)
+        opt_g = torch.optim.Adam(self.generator.parameters(), lr=self.args['learning_rate'])
 
         #opt_d = torch.optim.RMSprop(self.discriminator.parameters(), lr=0.00005, weight_decay=0)
         #opt_g = torch.optim.RMSprop(self.generator.parameters(), lr=0.00005, weight_decay=0)
@@ -326,10 +283,13 @@ class GTIGRE(pl.LightningModule):
         outputs = self.return_gan_outputs(batch, train=True)
 
         # Compute the discriminator and generator loss based on the generated outputs
-        d_loss, g_loss = self.ls_loss(outputs)
+        d_loss, g_loss, info = self.loss_fn.calculate(outputs)
 
         # Calculate the mean squared error (MSE) between the real and imputed data
-        self.calculate_error_imputation(outputs)
+        info['imputation'] = self.calculate_error_imputation(outputs)
+
+        # Log the results
+        self.log_results(info)
 
         # Select the appropriate loss based on the optimizer index
         loss = d_loss if optimizer_idx == 0 else g_loss
@@ -348,7 +308,11 @@ class GTIGRE(pl.LightningModule):
         outputs = self.return_gan_outputs(batch)
 
         # Calculate the mean squared error (MSE) between the real and imputed data
-        self.calculate_error_imputation(outputs, type_step='val')
+        info = {}
+        info['imputation'] = self.calculate_error_imputation(outputs, type_step='val')
+
+        # Log the results
+        self.log_results(info, type_step='val')
 
     def test_step(self, batch: Tuple, batch_idx: int) -> None:
         """Runs a single test step on a batch of data.
@@ -362,7 +326,11 @@ class GTIGRE(pl.LightningModule):
         outputs = self.multiple_imputation(batch) if not self.ablation_loop else self.return_gan_outputs(batch)
 
         # Calculate the mean squared error (MSE) between the real and imputed data
-        self.calculate_error_imputation(outputs, type_step='test')
+        info = {}
+        info['imputation'] = self.calculate_error_imputation(outputs, type_step='test')
+
+        # Log the results
+        self.log_results(info, type_step='test')
 
     def predict_step(self, batch: Tuple, batch_idx: int, dataloader_idx: int = None) -> torch.Tensor:
         """
