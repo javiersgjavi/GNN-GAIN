@@ -117,6 +117,7 @@ if __name__ == '__main__':
         '--loss',
         help='Loss function to use',
         choices=['base', 'ls', None],
+        default=None,
     )
 
     args = parser.parse_args()

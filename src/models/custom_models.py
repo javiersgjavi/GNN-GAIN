@@ -22,10 +22,10 @@ encoders = {
     'rnn': RNN,
     #'mrnn': MultiRNN,
     'tcn': TemporalConvNet, 
-    'stcn': SpatioTemporalConvNet, 
-    'transformer': Transformer, #falla
+    'stcn': SpatioTemporalConvNet, #falla
+    'transformer': Transformer,
     'stransformer': SpatioTemporalTransformerLayer, #falla
-    'gcrnn': GraphConvRNN #falla
+    'gcrnn': GraphConvRNN 
 }
 
 class UniModel(nn.Module):
@@ -42,11 +42,11 @@ class UniModel(nn.Module):
 
     def forward(self, x, edges, weights):
 
-        print(f'input shape: {x.shape}')
+        #print(f'input shape: {x.shape}')
         x = self.encoder(x) if self.name != 'stcn' else self.encoder(x, edges, weights)
-        print(f'encoder output shape: {x.shape}')
+        #print(f'encoder output shape: {x.shape}')
         x = self.decoder(x, edges, weights)
-        print(f'decoder output shape: {x.shape}\n')
+        #print(f'decoder output shape: {x.shape}\n')
         return x
 
 class BiModel(BaseGNN):
@@ -147,14 +147,14 @@ class BiModel(BaseGNN):
    
 
     def bi_forward(self, input_tensor_f, input_tensor_b, edges, weights):
-        print('Forward --------------------------\n')
+        #print('Forward --------------------------\n')
         f_representation = self.model_f(input_tensor_f, edges, weights)
         b_representation = self.model_b(input_tensor_b, edges, weights)
 
         h = torch.cat([f_representation, torch.flip(b_representation, dims=[1])], dim=-1)
-        print(f'concatenated shape: {h.shape}')
+        #print(f'concatenated shape: {h.shape}')
         output = self.decoder_mlp(h)
-        print(f'output shape: {output.shape}\n')
+        #print(f'output shape: {output.shape}\n')
         return output
     
     def forward_g(self, x: torch.Tensor, input_mask: torch.Tensor, time_gap_matrix: torch.Tensor):
@@ -170,7 +170,7 @@ class BiModel(BaseGNN):
             torch.Tensor: The imputed tensor.
 
         """
-        print('GENERATOR --------------------------\n')
+        #print('GENERATOR --------------------------\n')
         noise_matrix = generate_uniform_noise(tensor_like=x)
 
         # Concatenate the input tensor with the noise matrix
@@ -200,7 +200,7 @@ class BiModel(BaseGNN):
             torch.Tensor: The output tensor of the discriminator network.
 
         """
-        print('DISCRIMINATOR --------------------------\n')
+        #print('DISCRIMINATOR --------------------------\n')
         input_tensor_f = torch.stack([x, hint_matrix]).permute(1, 2, 3, 0)
         input_tensor_b = torch.flip(input_tensor_f, dims=[1])
         pred = self.bi_forward(input_tensor_f, input_tensor_b, self.edge_index, self.edge_weights).squeeze(dim=-1)
