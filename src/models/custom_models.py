@@ -50,11 +50,11 @@ class UniModel(nn.Module):
         return x
 
 class BiModel(BaseGNN):
-    def __init__(self, args, time_gap_matrix=False, gen=False):
+    def __init__(self, args, time_gap_matrix=False, critic=False):
         super().__init__(edge_index=args['edge_index'], edge_weights=args['edge_weights'])
 
         self.args = args
-        self.gen = gen
+        self.critic = critic
         self.time_gap_matrix = time_gap_matrix
         self.output_size_decoder = int(args['periods'] * args['mlp']['hidden_size'])//2
         
@@ -65,14 +65,16 @@ class BiModel(BaseGNN):
 
         self.define_mlp_decoder(self.args['mlp'])
 
+        if self.critic:
+            # apply spectral norm
+            pass
+
         print(self.model_f)
         print(self.decoder_mlp)
 
     def param_cleaner(self):
         encoder_name = self.args['encoder_name']
         in_features = 2 if not self.time_gap_matrix else 3
-
-        
         
         self.args['decoder']['hidden_size'] = int(self.args['periods'] * self.args['decoder']['hidden_size'])
         self.args['decoder']['output_size'] = self.output_size_decoder
@@ -140,7 +142,7 @@ class BiModel(BaseGNN):
             input_size = output_size
 
         self.decoder_mlp.add_module(f'final_linear', nn.Linear(input_size, 1))
-        if self.gen:
+        if not self.critic:
             self.decoder_mlp.add_module(f'final_activation', activations['sigmoid']())
 
         self.decoder_mlp.apply(init_weights_xavier)
