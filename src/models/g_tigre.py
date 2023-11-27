@@ -106,7 +106,7 @@ class GTIGRE(pl.LightningModule):
 
         self.use_time_gap = params['use_time_gap_matrix']
         self.generator = model(copy.deepcopy(self.args), time_gap_matrix=self.use_time_gap)
-        self.discriminator = model(copy.deepcopy(self.args), time_gap_matrix=self.use_time_gap, critic=True)
+        self.discriminator = model(copy.deepcopy(self.args), time_gap_matrix=self.use_time_gap, d=True)
 
         self.hint_generator = HintGenerator(prop_hint=hint_rate)
 
