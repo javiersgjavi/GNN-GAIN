@@ -29,8 +29,9 @@ encoders = {
 }
 
 class UniModel(nn.Module):
-    def __init__(self, hyperparameters):
+    def __init__(self, hyperparameters, d = False):
         super().__init__()
+        self.d = d
         self.name = hyperparameters['encoder_name']
 
         self.encoder = encoders[hyperparameters['encoder_name']](**hyperparameters['encoder'])
@@ -39,6 +40,12 @@ class UniModel(nn.Module):
 
         self.encoder.apply(init_weights_xavier)
         self.decoder.apply(init_weights_xavier)
+
+        if self.d and hyperparameters['loss_fn'] == 'ws':
+            self.encoder = apply_spectral_norm(self.encoder)
+            self.decoder = apply_spectral_norm(self.decoder)
+
+
 
     def forward(self, x, edges, weights):
 
@@ -55,22 +62,17 @@ class BiModel(BaseGNN):
 
         self.args = args
         self.d = d
-        self.loss = self.args['loss']
+        self.loss = self.args['loss_fn']
         self.critic = self.d and self.loss in ['ws', 'ls']
         self.time_gap_matrix = time_gap_matrix
         self.output_size_decoder = int(args['periods'] * args['mlp']['hidden_size'])//2
         
         self.param_cleaner()
 
-        self.model_f = UniModel(self.args)
-        self.model_b = UniModel(self.args)
+        self.model_f = UniModel(self.args, self.d)
+        self.model_b = UniModel(self.args, self.d)
 
         self.define_mlp_decoder(self.args['mlp'])
-
-        if self.d and self.loss == 'ws':
-            self.model_f = apply_spectral_norm(self.model_f)
-            self.model_b = apply_spectral_norm(self.model_b)
-            self.decoder_mlp = apply_spectral_norm(self.decoder_mlp)
 
         print(self.model_f)
         print(self.decoder_mlp)
@@ -150,6 +152,9 @@ class BiModel(BaseGNN):
             self.decoder_mlp.add_module(f'final_activation', activations['sigmoid']())
 
         self.decoder_mlp.apply(init_weights_xavier)
+
+        if self.d and self.loss == 'ws':
+            self.decoder_mlp = apply_spectral_norm(self.decoder_mlp)
    
 
     def bi_forward(self, input_tensor_f, input_tensor_b, edges, weights):

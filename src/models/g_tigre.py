@@ -13,7 +13,7 @@ from src.models.gnn_models_bi import GRUGCNBI, RNNEncGCNDecBI
 from src.models.custom_models import BiModel
 from src.models.losses import BaseGANLoss, LSGANLoss, WSGANLoss
 
-from src.utils import mean_relative_error
+from src.utils import mean_relative_error, loss_controller_ws
 
 class HintGenerator:
     """
@@ -117,6 +117,7 @@ class GTIGRE(pl.LightningModule):
             ablation_gan=ablation_gan,
             ablation_reconstruction=ablation_reconstruction
         )
+
 
         self.d_i = 0
     # -------------------- Custom methods --------------------
@@ -292,7 +293,11 @@ class GTIGRE(pl.LightningModule):
         self.log_results(info)
 
         # Select the appropriate loss based on the optimizer index
-        loss = d_loss if optimizer_idx == 0 else g_loss
+
+        if not self.args['loss_fn'] == 'ws':
+            loss = d_loss if optimizer_idx == 0 else g_loss
+        else:
+            loss, self.d_i = loss_controller_ws(d_loss, g_loss, optimizer_idx, self.d_i)
 
         return loss
 

@@ -153,3 +153,21 @@ def apply_spectral_norm(m):
                     if 'weight' in p:
                         spectral_norm(module, name=p)
     return m
+
+
+def loss_controller_ws(d_loss, g_loss, opt_id, d_i):
+    sel_loss = None
+    it_g_train = 5
+    if opt_id == 0 and d_i < it_g_train:
+        sel_loss = d_loss
+        d_i += 1
+
+    elif opt_id == 1 and d_i >= it_g_train:
+        sel_loss = g_loss
+        d_i = 0
+
+    else:
+        sel_loss = torch.zeros_like(d_loss, requires_grad=True, device=d_loss.device)
+
+    return sel_loss, d_i
+        
