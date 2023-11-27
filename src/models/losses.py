@@ -104,8 +104,11 @@ class WSGANLoss(BaseLoss):
     def d_loss_fn(self, d_pred, mask_int, mask_bool):
         critic_real = d_pred[mask_bool].mean()
         critic_fake = d_pred[~mask_bool].mean()
+
+        #print(f'critic_real: {critic_real}')
+        #print(f'critic_fake: {critic_fake}')
         return -(critic_real - critic_fake)
 
     def g_adv_loss_fn(self, d_pred, mask_int, mask_bool):
         critic_fake = d_pred[~mask_bool].mean()
-        return critic_fake
+        return -critic_fake

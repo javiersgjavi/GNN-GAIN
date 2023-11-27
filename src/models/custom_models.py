@@ -7,7 +7,7 @@ from tsl.nn.blocks.encoders.recurrent import RNN, GraphConvRNN#, MultiRNN
 from tsl.nn.blocks.decoders import GCNDecoder
 
 from src.models.gnn_models_bi import BaseGNN
-from src.utils import init_weights_xavier, generate_uniform_noise, round_to_nearest_divisible
+from src.utils import init_weights_xavier, generate_uniform_noise, round_to_nearest_divisible, apply_spectral_norm
 
 activations = {
     'relu': nn.ReLU,
@@ -29,8 +29,9 @@ encoders = {
 }
 
 class UniModel(nn.Module):
-    def __init__(self, hyperparameters):
+    def __init__(self, hyperparameters, d = False):
         super().__init__()
+        self.d = d
         self.name = hyperparameters['encoder_name']
 
         self.encoder = encoders[hyperparameters['encoder_name']](**hyperparameters['encoder'])
@@ -39,6 +40,12 @@ class UniModel(nn.Module):
 
         self.encoder.apply(init_weights_xavier)
         self.decoder.apply(init_weights_xavier)
+
+        if self.d and hyperparameters['loss_fn'] == 'ws':
+            self.encoder = apply_spectral_norm(self.encoder)
+            self.decoder = apply_spectral_norm(self.decoder)
+
+
 
     def forward(self, x, edges, weights):
 
@@ -50,18 +57,20 @@ class UniModel(nn.Module):
         return x
 
 class BiModel(BaseGNN):
-    def __init__(self, args, time_gap_matrix=False, gen=False):
+    def __init__(self, args, time_gap_matrix=False, d=False):
         super().__init__(edge_index=args['edge_index'], edge_weights=args['edge_weights'])
 
         self.args = args
-        self.gen = gen
+        self.d = d
+        self.loss = self.args['loss_fn']
+        self.critic = self.d and self.loss in ['ws', 'ls']
         self.time_gap_matrix = time_gap_matrix
         self.output_size_decoder = int(args['periods'] * args['mlp']['hidden_size'])//2
         
         self.param_cleaner()
 
-        self.model_f = UniModel(self.args)
-        self.model_b = UniModel(self.args)
+        self.model_f = UniModel(self.args, self.d)
+        self.model_b = UniModel(self.args, self.d)
 
         self.define_mlp_decoder(self.args['mlp'])
 
@@ -71,8 +80,6 @@ class BiModel(BaseGNN):
     def param_cleaner(self):
         encoder_name = self.args['encoder_name']
         in_features = 2 if not self.time_gap_matrix else 3
-
-        
         
         self.args['decoder']['hidden_size'] = int(self.args['periods'] * self.args['decoder']['hidden_size'])
         self.args['decoder']['output_size'] = self.output_size_decoder
@@ -140,10 +147,14 @@ class BiModel(BaseGNN):
             input_size = output_size
 
         self.decoder_mlp.add_module(f'final_linear', nn.Linear(input_size, 1))
-        if self.gen:
+
+        if not self.critic:
             self.decoder_mlp.add_module(f'final_activation', activations['sigmoid']())
 
         self.decoder_mlp.apply(init_weights_xavier)
+
+        if self.d and self.loss == 'ws':
+            self.decoder_mlp = apply_spectral_norm(self.decoder_mlp)
    
 
     def bi_forward(self, input_tensor_f, input_tensor_b, edges, weights):

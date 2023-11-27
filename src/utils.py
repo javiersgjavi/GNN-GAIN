@@ -1,9 +1,12 @@
 import os
+import tsl
 import numpy as np
 import torch
 from torch import nn
 from tqdm import tqdm
 from typing import Tuple
+
+from torch.nn.utils.parametrizations import spectral_norm
 
 def round_to_nearest_divisible(x, y):
         """
@@ -126,3 +129,45 @@ def add_sn(m):
         return nn.utils.spectral_norm(m)
     else:
         return m
+    
+def apply_spectral_norm(m):
+
+    class_trans_layer = tsl.nn.blocks.encoders.transformer.Transformer
+    decoder = tsl.nn.blocks.decoders.GCNDecoder
+
+    if isinstance(m, class_trans_layer) or isinstance(m, decoder):
+        for name, module in m.named_modules():
+            if isinstance(module, nn.Linear):
+                spectral_norm(module)
+
+    else:
+
+        for _, module in m.named_children():
+            
+            if isinstance(module, nn.Linear):
+                spectral_norm(module)
+
+            elif isinstance(module, nn.LSTM) or isinstance(module, nn.GRU):
+                print(module.__class__)
+                for p in module.state_dict().keys():
+                    if 'weight' in p:
+                        spectral_norm(module, name=p)
+    return m
+
+
+def loss_controller_ws(d_loss, g_loss, opt_id, d_i):
+    sel_loss = None
+    it_g_train = 5
+    if opt_id == 0 and d_i < it_g_train:
+        sel_loss = d_loss
+        d_i += 1
+
+    elif opt_id == 1 and d_i >= it_g_train:
+        sel_loss = g_loss
+        d_i = 0
+
+    else:
+        sel_loss = torch.zeros_like(d_loss, requires_grad=True, device=d_loss.device)
+
+    return sel_loss, d_i
+        
