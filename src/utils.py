@@ -66,6 +66,10 @@ def create_windows_from_sequence(data, mask, known_values, time_gap_matrix_f, ti
         np.array(windows_time_gap_matrix_f),
         np.array(windows_time_gap_matrix_b)
     )
+
+    for i in res:
+        print(i.shape)
+        
     return res
 
 

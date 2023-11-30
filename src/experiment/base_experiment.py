@@ -8,6 +8,7 @@ import pandas as pd
 from tqdm import tqdm
 from src.models.g_tigre import GTIGRE, GTIGRE_DYNAMIC
 from src.data.traffic import MetrLADataset, PemsBayDataset
+from src.data.mimic_iii import MIMICIIIDataset
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from torch.optim.lr_scheduler import CosineAnnealingLR
@@ -80,10 +81,14 @@ class BaseExperiment:
 
     def prepare_data(self):
         name_dataset = self.dataset.split('_')[0]
+
         if name_dataset == 'la':
             dm = MetrLADataset(point=True)
         elif name_dataset == 'bay':
             dm = PemsBayDataset(point=True)
+        elif name_dataset == 'mimic':
+            dm = MIMICIIIDataset()
+
         edge_index, edge_weights = dm.get_connectivity()
         normalizer = dm.get_normalizer()
         dm.setup()

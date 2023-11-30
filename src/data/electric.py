@@ -2,10 +2,11 @@ import os
 import numpy as np
 import pandas as pd
 
+from src.data.datamodule import DataModule
 from src.utils import load_time_gap_matrix
 
-class ElectricDataset:
-    def __init__(self, prop_missing=0.1, seed=None, use_time_gap_matrix=False):
+class ElectricDataset(DataModule):
+    def __init__(self, prop_missing=0.1, seed=None, use_time_gap_matrix=False, **kwargs):
 
         if seed is None:
             seed = 50
@@ -35,7 +36,8 @@ class ElectricDataset:
         self.data = data
         self.mask = training_mask
         self.known_values = eval_mask
-
+        
+        super().__init__(**kwargs)
     def _calculate_connectivity(self):
         edge_index = np.array([
             np.repeat(np.arange(6), 6),

@@ -48,7 +48,7 @@ def main(args):
         datasets=datasets,
         iterations=iterations,
         gpu=[gpu],
-        max_iter_train=5000,
+        max_iter_train=20000,
         bi=bi,
         time_gap=time_gap,
         folder=folder,
@@ -64,7 +64,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--datasets',
         help='datasets to optimize separated by commas, e.g. la,bay,air,air-36,electric{missing_prop}',
-        default='la,bay',
+        default='la,bay,mimic',
         type=str)
     parser.add_argument(
         '--models',
@@ -116,7 +116,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--loss',
         help='Loss function to use',
-        choices=['base', 'ls', None],
+        choices=['base', 'ls', 'ws', None],
         default=None,
     )
 
