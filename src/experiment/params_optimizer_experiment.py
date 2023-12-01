@@ -133,9 +133,10 @@ class RandomSearchExperiment(BaseExperiment):
         return super().train_test(hyperparameters)
 
     def run(self):
-        i = self.results_file.shape[0]
-        with tqdm(total=self.iterations, desc=f'{self.exp_name} with {self.model_name} in {self.dataset}') as pbar:
-            while i < self.iterations:
+        remaining_iterations = self.iterations - self.results_file.shape[0]
+        i = 0
+        with tqdm(total=remaining_iterations, desc=f'{self.exp_name} with {self.model_name} in {self.dataset}') as pbar:
+            while i < remaining_iterations:
                 try:
                     hyperparameters = self.params_loader.get_params(i)
                     results = self.train_test(hyperparameters)
