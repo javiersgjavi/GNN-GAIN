@@ -133,6 +133,27 @@ class RandomSearchExperiment(BaseExperiment):
         return super().train_test(hyperparameters)
 
     def run(self):
+        i = self.results_file.shape[0]
+        with tqdm(total=self.iterations, desc=f'{self.exp_name} with {self.model_name} in {self.dataset}') as pbar:
+            while i < self.iterations:
+                try:
+                    hyperparameters = self.params_loader.get_params(i)
+                    results = self.train_test(hyperparameters)
+                    self.save_results_file(results, hyperparameters)
+                    i += 1
+                    pbar.update(1)
+                    
+                except KeyboardInterrupt as e:
+                    raise e
+
+                except Exception as e:
+                    print(e)
+
+
+                    
+        pbar.close()
+
+
         for i in tqdm(range(self.results_file.shape[0], self.iterations),
                       desc=f'{self.exp_name} with {self.model_name} in {self.dataset}'):
             hyperparameters = self.params_loader.get_params(i)
@@ -223,7 +244,7 @@ class RandomSearch:
         for dataset, model in itertools.product(self.datasets, self.models):
             results_path = f'./{self.folder}/{dataset}/'
 
-            param_loader = RandomSearchParamLoader(model, self.iterations, self.bi, self.loss_fn)
+            param_loader = RandomSearchParamLoader(model, self.iterations*5, self.bi, self.loss_fn)
             
             random_search = RandomSearchExperiment(
                 model=model,
