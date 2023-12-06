@@ -149,8 +149,6 @@ class RandomSearchExperiment(BaseExperiment):
 
                 except Exception as e:
                     print(e)
-
-
                     
         pbar.close()
 

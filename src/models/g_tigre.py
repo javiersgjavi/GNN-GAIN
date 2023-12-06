@@ -207,6 +207,12 @@ class GTIGRE(pl.LightningModule):
         # Forward Discriminator
         d_pred = self.discriminator.forward_d(x=x_fake, hint_matrix=hint_matrix)
 
+        if self.args['loss_fn'] == 'ws':
+            self.logger.experiment.add_scalars(f"D behaviour", {
+                'critic_real': d_pred[input_mask_bool].mean().item(),
+                'critic_fake': d_pred[~input_mask_bool].mean().item(),
+            }, self.global_step)
+
         res = {
             'x_real': x_real,
             'x_fake': x_fake,
