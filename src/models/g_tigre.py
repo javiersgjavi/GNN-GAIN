@@ -349,13 +349,11 @@ class GTIGRE(pl.LightningModule):
         Returns:
             torch.Tensor: The imputed data for the given batch.
         """
+        outputs = self.multiple_imputation(batch) if not self.ablation_loop else self.return_gan_outputs(batch)
+        x_fake_norm = outputs['x_fake']
+        original_shape = x_fake_norm.shape
+        x_fake_denorm = self.normalizer.inverse_transform(x_fake_norm.reshape(-1, self.nodes).detach().cpu()).reshape(original_shape)
 
-        x, _, _, input_mask_int, _, time_gap_matrix = batch
-
-        # Forward Generator
-        x_fake, _ = self.generator.forward_g(x=x, input_mask=input_mask_int, time_gap_matrix=time_gap_matrix)
-
-        x_fake_denorm = self.normalizer.inverse_transform(x_fake.reshape(-1, self.nodes).detach().cpu())
 
         return x_fake_denorm
 

@@ -1,4 +1,5 @@
 # Byte-compiled / optimized / DLL files
+imputed_data/*
 results/*
 data/*
 .vscode/

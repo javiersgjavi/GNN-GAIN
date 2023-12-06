@@ -118,6 +118,8 @@ class DataModule(pl.LightningModule):
             time_gap_matrix_b=test['tgm_b']
         )
 
+
+
         # Create DataLoader objects for each set
         self.train_loader = DataLoader(data_train, batch_size=self.batch_size, shuffle=True)
         self.val_loader = DataLoader(data_val, batch_size=self.batch_size, shuffle=False)

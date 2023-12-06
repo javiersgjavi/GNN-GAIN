@@ -45,7 +45,7 @@ class BaseExperiment:
             default_hyperparameters = json.loads(default_hyperparameters)
 
             self.time_gap = default_hyperparameters['use_time_gap_matrix']
-            self.batch_size = default_hyperparameters['batch_size'][0]
+            self.batch_size = default_hyperparameters['batch_size'][0] if 'batch_size' in default_hyperparameters.keys() else 64
 
         else:
             self.time_gap = time_gap

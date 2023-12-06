@@ -1,6 +1,8 @@
 import os
+import torch
 import numpy as np
 import pandas as pd
+import copy
 
 from src.data.splitters import RatioSplitter
 from src.data.datamodule import DataModule
@@ -9,6 +11,7 @@ from src.utils import load_time_gap_matrix
 class MIMICIIIDataset(DataModule):
     def __init__(self, added_missing=0.1, seed=None, use_time_gap_matrix=False, **kwargs):
 
+        print(f'Added missing: {added_missing}')
         if seed is None:
             seed = 50
         np.random.seed(seed)
@@ -30,8 +33,12 @@ class MIMICIIIDataset(DataModule):
 
         self.edge_index, self.edge_weights = self._calculate_connectivity(data_pd)
         eval_mask = ~np.isnan(data)
-        training_mask = np.random.rand(*data.shape) > self.prop_missing
-        training_mask = np.where(eval_mask, training_mask, False)
+
+        if self.prop_missing != 0:
+            training_mask = np.random.rand(*data.shape) > self.prop_missing
+            training_mask = np.where(eval_mask, training_mask, False)
+        else:
+            training_mask = copy.deepcopy(eval_mask)
 
         print(training_mask.sum() / training_mask.size)
 
@@ -51,6 +58,9 @@ class MIMICIIIDataset(DataModule):
         self.known_values = eval_mask
 
         super().__init__(**kwargs)
+
+    def custom_setup(self, stage, train, val, test):
+        return super().setup(stage, train, val, test)
 
     def setup(self, stage=None):
         # Hay que quitarle la opción de crear windows porque ya las tenemos
@@ -95,3 +105,74 @@ class MIMICIIIDataset(DataModule):
     
     def dataframe(self):
         return self.data
+    
+class MIMICIIIDatasetToImpute(MIMICIIIDataset):
+    def __init__(self, *args, **kwargs):
+        # change prop_missing to 0
+        kwargs['added_missing'] = 0
+        super().__init__(*args, **kwargs)
+
+    def setup(self, stage=None):
+
+        self.splitter = RatioSplitter(
+                data=self.data,
+                mask=self.mask,
+                known_values=self.known_values,
+                time_gap_matrix_f=self.time_gap_matrix_f,
+                time_gap_matrix_b=self.time_gap_matrix_b,
+                windows_len=49,
+                stride=49
+            )
+        self.splitter.create_windows()
+
+        self.data = self.splitter.data
+        self.mask = self.splitter.mask
+        self.known_values = self.splitter.known_values
+        self.time_gap_matrix_f = self.splitter.tgm_f
+        self.time_gap_matrix_b = self.splitter.tgm_b
+
+
+        train = {'data': self.data,
+                 'mask': self.mask,
+                 'known_values': self.known_values,
+                 'tgm_f': self.time_gap_matrix_f,
+                 'tgm_b': self.time_gap_matrix_b}
+
+        val  = copy.deepcopy(train)
+        test = copy.deepcopy(train)
+        self.shape = self.data.shape
+        return super().custom_setup(stage, train, val, test)
+
+class ImputedMIMICIIIDataset:
+
+    def __init__(self, data, output_path):
+        self.data = np.concatenate(data, axis=0)
+        self.data = np.transpose(self.data, (0, 2, 1)).astype(np.float32)
+
+        self.output_path = f'{output_path}mimic-iii'
+
+    def save(self):
+
+        train_len = 4951
+        val_len = 617
+        test_len = 613
+
+        train = self.data[:train_len]
+        val = self.data[train_len:train_len+val_len]
+        test = self.data[train_len+val_len:]
+
+        os.makedirs(f'{self.output_path}/train/', exist_ok=True)
+        os.makedirs(f'{self.output_path}/val/', exist_ok=True)
+        os.makedirs(f'{self.output_path}/test/', exist_ok=True)
+
+        np.save(f'{self.output_path}/train/x_dl.npy', train)
+        np.save(f'{self.output_path}/val/x_dl.npy', val)
+        np.save(f'{self.output_path}/test/x_dl.npy', test)
+
+        np.save(f'{self.output_path}/train/x_ml.npy', train.reshape(train.shape[0], -1))
+        np.save(f'{self.output_path}/val/x_ml.npy', val.reshape(val.shape[0], -1))
+        np.save(f'{self.output_path}/test/x_ml.npy', test.reshape(test.shape[0], -1))
+
+        
+
+        
