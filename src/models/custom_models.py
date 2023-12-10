@@ -34,9 +34,10 @@ class UniModel(nn.Module):
         self.d = d
         self.name = hyperparameters['encoder_name']
 
-        self.encoder = encoders[hyperparameters['encoder_name']](**hyperparameters['encoder'])
+        structure = hyperparameters['discriminator' if self.d else 'generator']
+        self.encoder = encoders[hyperparameters['encoder_name']](**structure['encoder'])
         
-        self.decoder = GCNDecoder(**hyperparameters['decoder'])
+        self.decoder = GCNDecoder(**structure['decoder'])
 
         self.encoder.apply(init_weights_xavier)
         self.decoder.apply(init_weights_xavier)
@@ -61,62 +62,64 @@ class BiModel(BaseGNN):
         super().__init__(edge_index=args['edge_index'], edge_weights=args['edge_weights'])
 
         self.args = args
+        print(self.args)
         self.d = d
         self.loss = self.args['loss_fn']
         self.critic = self.d and self.loss in ['ws', 'ls']
         self.time_gap_matrix = time_gap_matrix
-        self.output_size_decoder = int(args['periods'] * args['mlp']['hidden_size'])//2
+        self.output_size_decoder = int(args['periods'] * args['generator']['mlp']['hidden_size'])//2
         
-        self.param_cleaner()
+        self.param_cleaner('generator')
+        self.param_cleaner('discriminator')
 
         self.model_f = UniModel(self.args, self.d)
         self.model_b = UniModel(self.args, self.d)
 
-        self.define_mlp_decoder(self.args['mlp'])
+        self.define_mlp_decoder(self.args['generator']['mlp'])
 
         print(self.model_f)
         print(self.decoder_mlp)
 
-    def param_cleaner(self):
+    def param_cleaner(self, model):
         encoder_name = self.args['encoder_name']
         in_features = 2 if not self.time_gap_matrix else 3
         
-        self.args['decoder']['hidden_size'] = int(self.args['periods'] * self.args['decoder']['hidden_size'])
-        self.args['decoder']['output_size'] = self.output_size_decoder
-        self.args['decoder']['horizon'] = self.args['periods']
+        self.args[model]['decoder']['hidden_size'] = int(self.args['periods'] * self.args[model]['decoder']['hidden_size'])
+        self.args[model]['decoder']['output_size'] = self.output_size_decoder
+        self.args[model]['decoder']['horizon'] = self.args['periods']
 
-        self.args['mlp']['input_size'] = self.output_size_decoder*2
+        self.args[model]['mlp']['input_size'] = self.output_size_decoder*2
 
         if encoder_name == 'rnn':
-            self.args['encoder']['input_size'] = in_features
-            self.args['encoder']['hidden_size'] = int(self.args['periods'] * self.args['encoder']['hidden_size'])
-            self.args['encoder']['output_size'] = int(self.args['periods'] * self.args['encoder']['output_size'])
-            self.args['encoder']['exog_size'] = 0
+            self.args[model]['encoder']['input_size'] = in_features
+            self.args[model]['encoder']['hidden_size'] = int(self.args['periods'] * self.args[model]['encoder']['hidden_size'])
+            self.args[model]['encoder']['output_size'] = int(self.args['periods'] * self.args[model]['encoder']['output_size'])
+            self.args[model]['encoder']['exog_size'] = 0
 
-            self.args['decoder']['input_size'] = self.args['encoder']['output_size']
+            self.args[model]['decoder']['input_size'] = self.args[model]['encoder']['output_size']
 
         elif encoder_name == 'tcn':
-            self.args['encoder']['input_channels'] = in_features
-            self.args['encoder']['hidden_channels'] = int(self.args['periods'] * self.args['encoder']['hidden_channels'])
-            self.args['encoder']['output_channels'] = int(self.args['periods'] * self.args['encoder']['output_channels'])
+            self.args[model]['encoder']['input_channels'] = in_features
+            self.args[model]['encoder']['hidden_channels'] = int(self.args['periods'] * self.args[model]['encoder']['hidden_channels'])
+            self.args[model]['encoder']['output_channels'] = int(self.args['periods'] * self.args[model]['encoder']['output_channels'])
 
-            self.args['decoder']['input_size'] = self.args['encoder']['output_channels']
+            self.args[model]['decoder']['input_size'] = self.args[model]['encoder']['output_channels']
 
         elif encoder_name == 'stcn':
-            self.args['encoder']['input_size'] = in_features
-            self.args['encoder']['output_size'] = int(self.args['periods'] * self.args['encoder']['output_size'])
+            self.args[model]['encoder']['input_size'] = in_features
+            self.args[model]['encoder']['output_size'] = int(self.args['periods'] * self.args[model]['encoder']['output_size'])
 
-            self.args['decoder']['input_size'] = self.args['encoder']['output_size']
+            self.args[model]['decoder']['input_size'] = self.args[model]['encoder']['output_size']
 
         elif encoder_name == 'transformer':
-            self.args['encoder']['input_size'] = in_features
-            hidden_size = int(self.args['periods'] * self.args['encoder']['hidden_size'])
-            self.args['encoder']['hidden_size'] = round_to_nearest_divisible(hidden_size, self.args['encoder']['n_heads'])
+            self.args[model]['encoder']['input_size'] = in_features
+            hidden_size = int(self.args['periods'] * self.args[model]['encoder']['hidden_size'])
+            self.args[model]['encoder']['hidden_size'] = round_to_nearest_divisible(hidden_size, self.args[model]['encoder']['n_heads'])
 
-            self.args['encoder']['ff_size'] = int(self.args['periods'] * self.args['encoder']['ff_size'])
-            self.args['encoder']['output_size'] = int(self.args['periods'] * self.args['encoder']['output_size'])
+            self.args[model]['encoder']['ff_size'] = int(self.args['periods'] * self.args['encoder']['ff_size'])
+            self.args[model]['encoder']['output_size'] = int(self.args['periods'] * self.args['encoder']['output_size'])
 
-            self.args['decoder']['input_size'] = self.args['encoder']['output_size']
+            self.args[model]['decoder']['input_size'] = self.args[model]['encoder']['output_size']
 
         print('------- FINAL ARGS -------')
         for k, v in self.args.items():

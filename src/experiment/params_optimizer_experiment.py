@@ -22,7 +22,8 @@ class RandomSearchParamLoader:
         with open(f'src/experiment/{file}') as f:
             self.params_grid = json.load(f)
 
-        self.random_params = self.load_params_grid(n_iter)
+        self.random_params_g = self.load_params_grid(n_iter)
+        self.random_params_d = self.load_params_grid(n_iter)
 
     def load_params_grid(self, n_iter):
         params_dict = {
@@ -45,8 +46,7 @@ class RandomSearchParamLoader:
                 'n_layers': randint_close_interval(*self.params_grid['mlp_layers'], size=n_iter),
                 'dropout': uniform(*self.params_grid['mlp_dropout'], size=n_iter),
                 'activation': choice(self.params_grid['mlp_activation'], size=n_iter),
-            },
-            
+            },   
         }
 
         if self.model_name == 'rnn':
@@ -55,7 +55,6 @@ class RandomSearchParamLoader:
             params_dict['encoder']['cell'] = choice(self.params_grid['rnn']['cell'], size=n_iter)
             params_dict['encoder']['hidden_size'] = uniform(*self.params_grid['rnn']['hidden_size'], size=n_iter)
             params_dict['encoder']['output_size'] = uniform(*self.params_grid['encoder_output'], size=n_iter)
-
     
         elif self.model_name == 'mrnn':
             params_dict['encoder_type'] = ['mrnn' for _ in range(n_iter)]
@@ -63,7 +62,6 @@ class RandomSearchParamLoader:
             params_dict['encoder']['cell'] = choice(self.params_grid['mrnn']['cell'], size=n_iter)
             params_dict['encoder']['hidden_size'] = uniform(*self.params_grid['mrnn']['hidden_size'], size=n_iter)
             params_dict['encoder']['output_size'] = uniform(*self.params_grid['encoder_output'], size=n_iter)
-
 
         elif self.model_name == 'tcn':
             params_dict['encoder_type'] = ['tcn' for _ in range(n_iter)]
@@ -109,12 +107,19 @@ class RandomSearchParamLoader:
             raise StopIteration
         
         params_iteration = {
-            'loss_fn': self.random_params['loss_fn'][i],
-            'learning_rate': self.random_params['learning_rate'][i],
-            'alpha': self.random_params['alpha'][i],
-            'encoder': {k: v[i] for k, v in self.random_params['encoder'].items()},
-            'decoder': {k: v[i] for k, v in self.random_params['decoder'].items()},
-            'mlp': {k: v[i] for k, v in self.random_params['mlp'].items()},
+            'loss_fn': self.random_params_g['loss_fn'][i],
+            'learning_rate': self.random_params_g['learning_rate'][i],
+            'alpha': self.random_params_g['alpha'][i],
+            'generator':{
+                'encoder': {k: v[i] for k, v in self.random_params_g['encoder'].items()},
+                'decoder': {k: v[i] for k, v in self.random_params_g['decoder'].items()},
+                'mlp': {k: v[i] for k, v in self.random_params_g['mlp'].items()},
+                },
+            'discriminator':{
+                'encoder': {k: v[i] for k, v in self.random_params_d['encoder'].items()},
+                'decoder': {k: v[i] for k, v in self.random_params_d['decoder'].items()},
+                'mlp': {k: v[i] for k, v in self.random_params_d['mlp'].items()},
+                },
         }
         return params_iteration
 
@@ -151,7 +156,6 @@ class RandomSearchExperiment(BaseExperiment):
                     print(e)
                     
         pbar.close()
-
 
         for i in tqdm(range(self.results_file.shape[0], self.iterations),
                       desc=f'{self.exp_name} with {self.model_name} in {self.dataset}'):
