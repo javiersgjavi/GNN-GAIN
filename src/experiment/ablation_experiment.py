@@ -1,3 +1,4 @@
+import time
 import torch
 import itertools
 import numpy as np
@@ -7,6 +8,8 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 from src.models.g_tigre import GTIGRE
+from src.data.traffic import MetrLADataset, PemsBayDataset
+from src.data.mimic_iii import MIMICIIIDataset
 from src.experiment.base_experiment import BaseExperiment, AverageResults
 
 class ExperimentAblation(BaseExperiment):
@@ -41,7 +44,15 @@ class ExperimentAblation(BaseExperiment):
         return edge_index, edge_weights
 
     def prepare_data(self):
-        dm = DataModule(dataset=self.dataset, batch_size=self.batch_size, use_time_gap_matrix=self.time_gap)
+        name_dataset = self.dataset.split('_')[0]
+
+        if name_dataset == 'la':
+            dm = MetrLADataset(point=True)
+        elif name_dataset == 'bay':
+            dm = PemsBayDataset(point=True)
+        elif name_dataset == 'mimic':
+            dm = MIMICIIIDataset()
+            
         edge_index, edge_weights = dm.get_connectivity()
         edge_index, edge_weights = self.make_graph_ablation(edge_index, edge_weights)
         normalizer = dm.get_normalizer()
@@ -79,9 +90,12 @@ class ExperimentAblation(BaseExperiment):
             callbacks=[early_stopping],
         )
 
+        start_time = time.time()
         self.trainer.fit(self.model, datamodule=self.dm)
+        elapsed_time = time.time() - start_time
 
         results = self.trainer.test(self.model, datamodule=self.dm)[0]
+        results['time'] = elapsed_time
         return results
     
 

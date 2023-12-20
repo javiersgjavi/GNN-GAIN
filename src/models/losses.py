@@ -18,14 +18,14 @@ class BaseLoss:
         if not self.ab_gan:
             res = self.d_loss_fn(*args)
         else:
-            res = zero_tensor_like(args['d_pred'])
+            res = torch.zeros(1, device=args[0].device, requires_grad=True)
         return res
 
     def get_g_adv_loss(self, *args):
         if not self.ab_gan:
             res = self.g_adv_loss_fn(*args)
         else:
-            res = zero_tensor_like(args['d_pred'])
+            res = torch.zeros(1, device=args[0].device, requires_grad=True)
         return res
 
     def get_reconstruction_loss(self, imputation, x_real, mask):

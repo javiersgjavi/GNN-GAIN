@@ -1,7 +1,7 @@
 import sys
 sys.path.append('./')
 import argparse
-from src.experiment.studies import AverageResults
+from src.experiment.base_experiment import AverageResults
 
 
 def main(args):

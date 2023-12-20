@@ -88,7 +88,7 @@ def mean_relative_error(x: np.array, y: np.array) -> np.array:
     Returns:
         np.array: Mean relative error
     """
-    return np.mean(np.abs(x - y) / np.abs(y)) * 100
+    return np.mean(np.abs(x - y) / np.abs(y + 1e-8)) * 100
 
 
 def count_missing_sequences(matriz, max_time_gap=24):

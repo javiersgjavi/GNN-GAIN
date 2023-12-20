@@ -5,7 +5,10 @@ import seaborn as sns
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-
+from src.experiment.base_experiment import BaseExperiment, AverageResults
+from src.models.g_tigre import GTIGRE, GTIGRE_DYNAMIC
+from src.data.traffic import MetrLADataset, PemsBayDataset
+from src.data.mimic_iii import MIMICIIIDataset
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
@@ -14,15 +17,15 @@ class MissingDataSensitivityExperiment(BaseExperiment):
         self.base_noise = base_noise
         self.trainning_threshold = trainning_threshold
         super().__init__(*args, **kwargs)
-        edge_index, edge_weights = dm.get_connectivity()
-        normalizer = dm.get_normalizer()
-        dm.setup()
+        self.edge_index, self.edge_weights = self.dm.get_connectivity()
+        self.normalizer = self.dm.get_normalizer()
+        self.dm.setup()
 
         if self.accelerator == 'gpu':
-            edge_index = torch.from_numpy(edge_index).to(f'cuda:{self.selected_gpu[0]}')
-            edge_weights = torch.from_numpy(edge_weights).to(f'cuda:{self.selected_gpu[0]}')
+            self.edge_index = torch.from_numpy(self.edge_index).to(f'cuda:{self.selected_gpu[0]}')
+            self.edge_weights = torch.from_numpy(self.edge_weights).to(f'cuda:{self.selected_gpu[0]}')
 
-        return dm, edge_index, edge_weights, normalizer
+        #return self.dm, edge_index, edge_weights, normalizer
     
     def train_model(self):
         print(f'[INFO] starting trainning base model')
