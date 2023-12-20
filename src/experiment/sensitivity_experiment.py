@@ -1,4 +1,6 @@
+import os
 import torch
+import time
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -20,6 +22,7 @@ class MissingDataSensitivityExperiment(BaseExperiment):
         self.edge_index, self.edge_weights = self.dm.get_connectivity()
         self.normalizer = self.dm.get_normalizer()
         self.dm.setup()
+        self.exp_name = 'Sensitivity experiment'
 
         if self.accelerator == 'gpu':
             self.edge_index = torch.from_numpy(self.edge_index).to(f'cuda:{self.selected_gpu[0]}')
@@ -33,7 +36,7 @@ class MissingDataSensitivityExperiment(BaseExperiment):
         best_candidate = None
         best_denorm_mae = 100000
         results_candidates = []
-        for i in tqdm(range(5)):
+        for i in tqdm(range(1)):
             self.model = GTIGRE_DYNAMIC(
                 model_type=self.model_name,
                 input_size=self.dm.input_size(),
@@ -56,10 +59,13 @@ class MissingDataSensitivityExperiment(BaseExperiment):
                 gradient_clip_algorithm='norm',
                 callbacks=[early_stopping],
             )
-
+            start_time = time.time()
             self.trainer.fit(self.model, datamodule=self.dm)
+            elapsed_time = time.time() - start_time
+
             results = self.trainer.test(self.model, datamodule=self.dm)[0]
-            
+            results['time'] = elapsed_time
+
             candidates.append(self.model)
             results_candidates.append(results['denorm_mae'])
             if results['denorm_mae'] < best_denorm_mae:
@@ -81,10 +87,14 @@ class MissingDataSensitivityExperiment(BaseExperiment):
         self.results_file = self.load_file()
 
         self.model.set_threshold(threshold)
+        
+        dm = MetrLADataset(p_noise=threshold, point=True)
+        dm.setup()
 
         for _ in tqdm(range(self.results_file.shape[0], self.iterations),
                       desc=f'{self.exp_name} with {self.model_name} in {self.dataset}'):
-            results = self.trainer.test(self.model, datamodule=self.dm)[0]
+            results = self.trainer.test(self.model, datamodule=dm)[0]
+            results['time'] = 0
             self.save_results_file(results, self.default_hyperparameters)
 
 class MissingDataSensitivityStudy(AverageResults):
