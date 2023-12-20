@@ -48,7 +48,7 @@ def main(args):
         datasets=datasets,
         iterations=iterations,
         gpu=[gpu],
-        max_iter_train=20000,
+        max_iter_train=7000,
         bi=bi,
         time_gap=time_gap,
         folder=folder,

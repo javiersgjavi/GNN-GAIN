@@ -16,6 +16,8 @@ class ImputeDatasetExperiment(BaseExperiment):
             models[results['mae']] = self.model
             trainers[results['mae']] = self.trainer
 
+        print(f'Best model: {min(models.keys())}')
+
         return models[min(models.keys())], trainers[min(models.keys())]
 
 
