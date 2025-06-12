@@ -1,6 +1,6 @@
 # GNN-GAIN
 
-Este repositorio implementa **G-TIGRE** (Graph-Time Imputation with Generative Recursive Estimators), un marco generativo basado en redes adversarias (GANs) y redes neuronales de grafos (GNNs) para la imputación de series temporales multivariantes sobre grafos.
+Este repositorio implementa **G-TIGRE** (Generative Time series Imputation with Graph-based REcurrent neural networks), un marco generativo basado en redes adversarias (GANs) y redes neuronales de grafos (GNNs) para la imputación de series temporales multivariantes sobre grafos.
 
 G-TIGRE permite entrenar sin observaciones completas y captura dependencias espaciotemporales usando GNNs en secuencias de grafos. El modelo integra una lectura bidireccional de la serie y realiza múltiples muestreos para escoger la imputación con menor evaluación adversaria.
 
